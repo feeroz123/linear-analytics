@@ -1,0 +1,41 @@
+{
+  "name": "linear-analytics",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "tsx src/server/index.ts",
+    "build": "vite build --config src/client/vite.config.ts && tsc -p tsconfig.json --noEmit",
+    "lint": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@fastify/cors": "^10.0.1",
+    "@fastify/middie": "^9.0.2",
+    "@fastify/sensible": "^6.0.1",
+    "@mantine/core": "7.17.8",
+    "@mantine/dates": "7.17.8",
+    "@mantine/hooks": "7.17.8",
+    "@mantine/notifications": "7.17.8",
+    "@tabler/icons-react": "^3.28.1",
+    "dayjs": "^1.11.13",
+    "@tanstack/react-query": "^5.66.2",
+    "@types/better-sqlite3": "^7.6.10",
+    "better-sqlite3": "^11.8.1",
+    "dotenv": "^16.4.5",
+    "fastify": "^5.1.0",
+    "node-fetch": "^3.3.2",
+    "openai": "^4.83.0",
+    "react": "18.3.1",
+    "react-dom": "18.3.1",
+    "recharts": "^2.12.7"
+  },
+  "devDependencies": {
+    "@types/node": "^22.10.1",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react-swc": "^3.7.0",
+    "tsx": "^4.19.2",
+    "typescript": "^5.6.3",
+    "vite": "^7.2.7"
+  }
+}
