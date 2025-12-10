@@ -2,6 +2,7 @@ import fetch from 'node-fetch';
 
 type CacheEntry<T> = { expires: number; value: T };
 
+type LinearTeam = { id: string; name: string };
 type LinearProject = { id: string; name: string; team: { name: string } | null };
 type LinearState = { id: string; name: string; type: 'triage' | 'backlog' | 'started' | 'completed' | 'canceled' | string };
 type LinearLabel = { name: string };
@@ -20,7 +21,7 @@ export type LinearIssue = {
 };
 
 const LINEAR_URL = 'https://api.linear.app/graphql';
-const CACHE_TTL_MS = 5 * 60 * 1000;
+const CACHE_TTL_MS = 30 * 60 * 1000;
 
 export class LinearClient {
   private token: string;
@@ -95,48 +96,55 @@ export class LinearClient {
     return projects;
   }
 
-  async getIssues(projectId: string, first = 100): Promise<LinearIssue[]> {
-    const cacheKey = `issues:${projectId}`;
-    const cached = this.getCache<LinearIssue[]>(cacheKey);
+  async getTeams(): Promise<LinearTeam[]> {
+    const cached = this.getCache<LinearTeam[]>('teams');
     if (cached) return cached;
+    const data = await this.query<{ teams: { nodes: LinearTeam[] } }>('query { teams { nodes { id name } } }');
+    const teams = data.teams?.nodes ?? [];
+    this.setCache('teams', teams);
+    return teams;
+  }
+
+  async getIssues(teamId: string, first = 100, preferCache = false): Promise<LinearIssue[]> {
+    const cacheKey = `issues:${teamId}`;
+    const cached = this.getCache<LinearIssue[]>(cacheKey);
+    if (cached || preferCache) return cached ?? [];
 
     let issues: LinearIssue[] = [];
     let hasNextPage = true;
     let after: string | null = null;
 
-    const query = `query Issues($projectId: String!, $first: Int!, $after: String) {
-      project(id: $projectId) {
-        issues(first: $first, after: $after) {
-          nodes {
-            id
-            title
-            createdAt
-            updatedAt
-            completedAt
-            state { id name type }
-            assignee { id name }
-            priority
-            labels { nodes { name } }
-            team { name }
-            estimate
-          }
-          pageInfo { hasNextPage endCursor }
+    const query = `query Issues($teamId: ID!, $first: Int!, $after: String) {
+      issues(first: $first, after: $after, filter: { team: { id: { eq: $teamId } } }) {
+        nodes {
+          id
+          title
+          createdAt
+          updatedAt
+          completedAt
+          state { id name type }
+          assignee { id name }
+          priority
+          labels { nodes { name } }
+          team { name }
+          estimate
         }
+        pageInfo { hasNextPage endCursor }
       }
     }`;
 
     while (hasNextPage) {
       const data = await this.query<{
-        project: { issues: { nodes: LinearIssue[]; pageInfo: { hasNextPage: boolean; endCursor: string } } } | null;
-      }>(query, { projectId, first, after });
+        issues: { nodes: LinearIssue[]; pageInfo: { hasNextPage: boolean; endCursor: string } };
+      }>(query, { teamId, first, after });
 
-      const pageIssues = data.project?.issues.nodes ?? [];
+      const pageIssues = data.issues?.nodes ?? [];
       const normalized = pageIssues.map((issue) => ({
         ...issue,
         labels: (issue as any).labels?.nodes ?? [],
       }));
       issues = issues.concat(normalized);
-      const pageInfo = data.project?.issues.pageInfo;
+      const pageInfo = data.issues?.pageInfo;
       hasNextPage = Boolean(pageInfo?.hasNextPage);
       after = pageInfo?.endCursor ?? null;
       if (!hasNextPage) break;

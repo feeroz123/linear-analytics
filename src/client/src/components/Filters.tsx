@@ -1,41 +1,51 @@
-import { Card, Grid, Select, Button, Group } from '@mantine/core';
+import { Card, Grid, Select, Button, Group, Text } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { IconRefresh } from '@tabler/icons-react';
-import { Filters, Project } from '../api';
+import { Filters, Team } from '../api';
 
 type Props = {
-  projects: Project[];
+  teams: Team[];
   filters: Filters;
   onChangeFilters: (f: Filters) => void;
-  projectId: string | null;
-  onSelectProject: (id: string) => void;
+  teamId: string | null;
+  onSelectTeam: (id: string) => void;
   assignees: { id: string; name: string }[];
   onRefresh: () => void;
+  onClearFilters: () => void;
   loading?: boolean;
+  disabled?: boolean;
+  loadingMessage?: string;
 };
 
 export default function FiltersBar({
-  projects,
+  teams,
   filters,
   onChangeFilters,
-  projectId,
-  onSelectProject,
+  teamId,
+  onSelectTeam,
   assignees,
   onRefresh,
+  onClearFilters,
   loading,
+  disabled,
+  loadingMessage,
 }: Props) {
+  const timeDisabled = disabled || Boolean(filters.startDate || filters.endDate);
+  const dateDisabled = disabled || Boolean(filters.time);
+
   return (
     <Card withBorder shadow="sm" mb="md" radius="md">
       <Grid gutter="sm" align="end">
         <Grid.Col span={{ base: 12, sm: 4, md: 3 }}>
           <Select
             label="Team"
-            data={projects.map((p) => ({ value: p.id, label: `${p.name} (${p.team.name})` }))}
+            data={teams.map((t) => ({ value: t.id, label: t.name }))}
             placeholder="Select team"
-            value={projectId}
-            onChange={(val) => val && onSelectProject(val)}
+            value={teamId}
+            onChange={(val) => val && onSelectTeam(val)}
             searchable
             radius="md"
+            disabled={disabled}
           />
         </Grid.Col>
         <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>
@@ -49,6 +59,7 @@ export default function FiltersBar({
             value={filters.time}
             onChange={(val) => onChangeFilters({ ...filters, time: val as Filters['time'] })}
             radius="md"
+            disabled={timeDisabled}
           />
         </Grid.Col>
         <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>
@@ -62,6 +73,7 @@ export default function FiltersBar({
             value={filters.state || 'all'}
             onChange={(val) => onChangeFilters({ ...filters, state: val as Filters['state'] })}
             radius="md"
+            disabled={disabled}
           />
         </Grid.Col>
         <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>
@@ -76,6 +88,7 @@ export default function FiltersBar({
             value={filters.type || 'all'}
             onChange={(val) => onChangeFilters({ ...filters, type: val as Filters['type'] })}
             radius="md"
+            disabled={disabled}
           />
         </Grid.Col>
         <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>
@@ -86,6 +99,7 @@ export default function FiltersBar({
             onChange={(val) => onChangeFilters({ ...filters, assigneeId: val || undefined })}
             searchable
             radius="md"
+            disabled={disabled}
           />
         </Grid.Col>
         <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>
@@ -97,6 +111,7 @@ export default function FiltersBar({
             }
             clearable
             radius="md"
+            disabled={dateDisabled}
           />
         </Grid.Col>
         <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>
@@ -106,10 +121,20 @@ export default function FiltersBar({
             onChange={(date) => onChangeFilters({ ...filters, endDate: date ? date.toISOString() : undefined })}
             clearable
             radius="md"
+            disabled={dateDisabled}
           />
         </Grid.Col>
-        <Grid.Col span={{ base: 12, sm: 4, md: 2 }}>
-          <Group align="end" justify="flex-end" h="100%">
+        <Grid.Col span={{ base: 12, sm: 8, md: 4 }}>
+          <Group align="end" justify="flex-end" h="100%" gap="xs">
+            <Button
+              variant="subtle"
+              onClick={onClearFilters}
+              radius="md"
+              size="sm"
+              disabled={disabled}
+            >
+              Clear Filters
+            </Button>
             <Button
               leftSection={<IconRefresh size={16} />}
               variant="light"
@@ -117,11 +142,22 @@ export default function FiltersBar({
               loading={loading}
               radius="md"
               size="sm"
+              disabled={disabled}
             >
               Refresh
             </Button>
           </Group>
         </Grid.Col>
+        {loadingMessage && (
+          <Grid.Col span={12}>
+            <Text
+              size="sm"
+              style={{ color: '#0b3d91', fontWeight: 700, fontStyle: 'italic' }}
+            >
+              {loadingMessage}
+            </Text>
+          </Grid.Col>
+        )}
       </Grid>
     </Card>
   );

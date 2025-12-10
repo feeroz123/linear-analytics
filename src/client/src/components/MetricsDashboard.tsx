@@ -42,8 +42,18 @@ const skeleton = <Skeleton height={160} radius="md" />;
 
 function EmptyState() {
   return (
-    <div style={{ height: 160, display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#868e96' }}>
-      No data yet. Select a project or adjust filters.
+    <div
+      style={{
+        height: 160,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        color: '#0b3d91',
+        fontWeight: 700,
+        fontStyle: 'italic',
+      }}
+    >
+      No data yet. Select a team or adjust filters.
     </div>
   );
 }
@@ -69,107 +79,79 @@ export default function MetricsDashboard({ metrics, loading }: Props) {
       <Text fw={700} size="lg">
         Default Metrics
       </Text>
-      <Grid gutter="md">
-        <Grid.Col span={{ base: 12, md: 6, lg: 3 }}>
-          <ChartCard
-            title="Throughput (weekly)"
-            tooltip="Completed issues grouped by week based on completedAt."
-            loading={loading}
-            onExpand={
-              metrics && metrics.throughput.length
-                ? () =>
-                    openModal(
-                      'Throughput (weekly)',
-                      <BarChartFull data={metrics.throughput} color={palette[0]} height={320} />,
-                    )
-                : undefined
-            }
-          >
-            {loading ? (
-              skeleton
-            ) : metrics && metrics.throughput.length ? (
-              <BarChartFull data={metrics.throughput} color={palette[0]} height={180} />
-            ) : (
-              <EmptyState />
-            )}
-          </ChartCard>
-        </Grid.Col>
+      <Stack gap="md">
+        <ChartCard
+          title="Throughput (weekly)"
+          tooltip="Completed issues grouped by week based on completedAt."
+          loading={loading}
+          onExpand={
+            metrics && metrics.throughput.length
+              ? () => openModal('Throughput (weekly)', <BarChartFull data={metrics.throughput} color={palette[0]} height={360} />)
+              : undefined
+          }
+        >
+          {loading ? skeleton : metrics && metrics.throughput.length ? <BarChartFull data={metrics.throughput} color={palette[0]} height={240} /> : <EmptyState />}
+        </ChartCard>
 
-        <Grid.Col span={{ base: 12, md: 6, lg: 3 }}>
-          <ChartCard
-            title="Open vs Closed"
-            tooltip="Distribution of open vs completed issues."
-            loading={loading}
-            onExpand={
-              metrics && metrics.openVsClosed.length
-                ? () =>
-                    openModal(
-                      'Open vs Closed',
-                      <PieChartFull data={metrics.openVsClosed} palette={palette} height={320} />,
-                    )
-                : undefined
-            }
-          >
-            {loading ? (
-              skeleton
-            ) : metrics && metrics.openVsClosed.length ? (
-              <PieChartFull data={metrics.openVsClosed} palette={palette} height={180} />
-            ) : (
-              <EmptyState />
-            )}
-          </ChartCard>
-        </Grid.Col>
+        <Grid gutter="md">
+          <Grid.Col span={{ base: 12, md: 4 }}>
+            <ChartCard
+              title="Open vs Closed"
+              tooltip="Distribution of open vs completed issues."
+              loading={loading}
+              onExpand={
+                metrics && metrics.openVsClosed.length
+                  ? () => openModal('Open vs Closed', <PieChartFull data={metrics.openVsClosed} palette={palette} height={320} />)
+                  : undefined
+              }
+            >
+              {loading ? skeleton : metrics && metrics.openVsClosed.length ? (
+                <PieChartFull data={metrics.openVsClosed} palette={palette} height={200} shrink={0.5} />
+              ) : (
+                <EmptyState />
+              )}
+            </ChartCard>
+          </Grid.Col>
 
-        <Grid.Col span={{ base: 12, md: 6, lg: 3 }}>
-          <ChartCard
-            title="Bugs / Assignee"
-            tooltip="Count of bug-type issues per assignee."
-            loading={loading}
-            onExpand={
-              metrics && metrics.bugsByAssignee.length
-                ? () =>
-                    openModal(
-                      'Bugs / Assignee',
-                      <BarAssignee data={metrics.bugsByAssignee} color={palette[2]} height={320} />,
-                    )
-                : undefined
-            }
-          >
-            {loading ? (
-              skeleton
-            ) : metrics && metrics.bugsByAssignee.length ? (
-              <BarAssignee data={metrics.bugsByAssignee} color={palette[2]} height={180} />
-            ) : (
-              <EmptyState />
-            )}
-          </ChartCard>
-        </Grid.Col>
+          <Grid.Col span={{ base: 12, md: 4 }}>
+            <ChartCard
+              title="Bugs / Assignee"
+              tooltip="Count of bug-type issues per assignee."
+              loading={loading}
+              onExpand={
+                metrics && metrics.bugsByAssignee.length
+                  ? () => openModal('Bugs / Assignee', <BarAssignee data={metrics.bugsByAssignee} color={palette[2]} height={320} />)
+                  : undefined
+              }
+            >
+              {loading ? skeleton : metrics && metrics.bugsByAssignee.length ? <BarAssignee data={metrics.bugsByAssignee} color={palette[2]} height={200} /> : <EmptyState />}
+            </ChartCard>
+          </Grid.Col>
 
-        <Grid.Col span={{ base: 12, md: 6, lg: 3 }}>
-          <ChartCard
-            title="Bugs: Severity / Priority"
-            tooltip="Bug counts grouped by severity label and priority."
-            loading={loading}
-            onExpand={
-              metrics && metrics.bugsBySeverityPriority.length
-                ? () =>
-                    openModal(
-                      'Bugs: Severity / Priority',
-                      <BarSeverity data={metrics.bugsBySeverityPriority} palette={palette} height={320} />,
-                    )
-                : undefined
-            }
-          >
-            {loading ? (
-              skeleton
-            ) : metrics && metrics.bugsBySeverityPriority.length ? (
-              <BarSeverity data={metrics.bugsBySeverityPriority} palette={palette} height={180} />
-            ) : (
-              <EmptyState />
-            )}
-          </ChartCard>
-        </Grid.Col>
-      </Grid>
+          <Grid.Col span={{ base: 12, md: 4 }}>
+            <ChartCard
+              title="Bugs: Severity / Priority"
+              tooltip="Bug counts grouped by severity label and priority."
+              loading={loading}
+              onExpand={
+                metrics && metrics.bugsBySeverityPriority.length
+                  ? () =>
+                      openModal(
+                        'Bugs: Severity / Priority',
+                        <BarSeverity data={metrics.bugsBySeverityPriority} palette={palette} height={320} />,
+                      )
+                  : undefined
+              }
+            >
+              {loading ? skeleton : metrics && metrics.bugsBySeverityPriority.length ? (
+                <BarSeverity data={metrics.bugsBySeverityPriority} palette={palette} height={200} />
+              ) : (
+                <EmptyState />
+              )}
+            </ChartCard>
+          </Grid.Col>
+        </Grid>
+      </Stack>
 
       <Modal opened={modal.open} onClose={closeModal} title={modal.title} size="xl" centered>
         {modal.content}
@@ -238,12 +220,23 @@ function BarChartFull({
   );
 }
 
-function PieChartFull({ data, palette, height }: { data: { name: string; value: number }[]; palette: string[]; height: number }) {
+function PieChartFull({
+  data,
+  palette,
+  height,
+  shrink,
+}: {
+  data: { name: string; value: number }[];
+  palette: string[];
+  height: number;
+  shrink?: number;
+}) {
+  const factor = shrink ?? 0.9;
   return (
     <div style={{ width: '100%', height }}>
       <ResponsiveContainer>
         <PieChart>
-          <Pie dataKey="value" data={data} outerRadius={Math.min(120, height / 2)} label>
+          <Pie dataKey="value" data={data} outerRadius={Math.min(120, height / 2) * factor} label>
             {data.map((_, i) => (
               <Cell key={i} fill={palette[i % palette.length]} />
             ))}

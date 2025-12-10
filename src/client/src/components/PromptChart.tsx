@@ -53,7 +53,11 @@ export default function PromptChart({ loading, onGenerate, result, disabled }: P
             Generate Chart
           </Button>
           {empty ? (
-            <Text c="dimmed" size="sm">
+            <Text
+              c="dimmed"
+              size="sm"
+              style={{ color: '#0b3d91', fontWeight: 700, fontStyle: 'italic' }}
+            >
               Generate a chart to see results.
             </Text>
           ) : (

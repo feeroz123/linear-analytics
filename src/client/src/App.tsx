@@ -1,44 +1,55 @@
 import React from 'react';
 import { Container, Loader, Center } from '@mantine/core';
 import { useQuery } from '@tanstack/react-query';
-import { fetchHealth, fetchProjects, fetchMetrics, Filters, generateChartFromPrompt } from './api';
+import { fetchHealth, fetchTeams, fetchMetrics, Filters, generateChartFromPrompt } from './api';
 import Layout from './components/Layout';
 import FiltersBar from './components/Filters';
 import MetricsDashboard from './components/MetricsDashboard';
 import PromptChart from './components/PromptChart';
 
-const defaultFilters: Filters = { time: '30d', state: 'all', type: 'all' };
+const defaultFilters: Filters = {};
 
 export default function App() {
-  const [projectId, setProjectId] = React.useState<string | null>(null);
+  const [teamId, setTeamId] = React.useState<string | null>(null);
   const [filters, setFilters] = React.useState<Filters>(defaultFilters);
+  const [shouldFetch, setShouldFetch] = React.useState(false);
 
   const healthQuery = useQuery({ queryKey: ['health'], queryFn: fetchHealth });
-  const projectsQuery = useQuery({ queryKey: ['projects'], queryFn: fetchProjects, staleTime: 5 * 60 * 1000 });
+  const teamsQuery = useQuery({ queryKey: ['teams'], queryFn: fetchTeams, staleTime: 5 * 60 * 1000 });
 
   React.useEffect(() => {
-    if (projectsQuery.data && !projectId) {
-      const saved = projectsQuery.data.lastProject;
-      if (saved) setProjectId(saved);
-      else if (projectsQuery.data.projects.length) setProjectId(projectsQuery.data.projects[0].id);
-      if (projectsQuery.data.savedFilters) setFilters({ ...defaultFilters, ...projectsQuery.data.savedFilters });
+    if (teamsQuery.data && !teamId) {
+      const saved = teamsQuery.data.lastTeam;
+      if (saved) setTeamId(saved);
+      else if (teamsQuery.data.teams.length) setTeamId(teamsQuery.data.teams[0].id);
+      setFilters(defaultFilters);
     }
-  }, [projectsQuery.data, projectId]);
+  }, [teamsQuery.data, teamId]);
+
+  const enforcedFilters = React.useMemo(
+    () => ({
+      ...filters,
+      time: '7d',
+      startDate: undefined,
+      endDate: undefined,
+    }),
+    [filters],
+  );
 
   const metricsQuery = useQuery({
-    queryKey: ['metrics', projectId, filters],
-    queryFn: () => fetchMetrics(projectId!, filters),
-    enabled: Boolean(projectId),
+    queryKey: ['metrics', teamId, enforcedFilters, shouldFetch],
+    queryFn: () => fetchMetrics(teamId!, enforcedFilters),
+    enabled: Boolean(teamId && shouldFetch),
     keepPreviousData: true,
   });
 
   const [promptResult, setPromptResult] = React.useState<{ spec: any; data: any } | null>(null);
   const [promptLoading, setPromptLoading] = React.useState(false);
   const handlePrompt = async (prompt: string) => {
-    if (!projectId) return;
+    if (!teamId) return;
     setPromptLoading(true);
     try {
-      const result = await generateChartFromPrompt(projectId, filters, prompt);
+      const result = await generateChartFromPrompt(teamId, enforcedFilters, prompt);
       setPromptResult(result);
     } catch (err) {
       console.error(err);
@@ -47,35 +58,42 @@ export default function App() {
     }
   };
 
-  const projects = projectsQuery.data?.projects || [];
+  const teams = teamsQuery.data?.teams || [];
 
-  const linearHealthy = Boolean(healthQuery.data?.linear || projectsQuery.isSuccess);
+  const linearHealthy = Boolean(healthQuery.data?.linear || teamsQuery.isSuccess);
+  const filtersDisabled = teamsQuery.isFetching || metricsQuery.isFetching;
+  const lastRefreshed = metricsQuery.dataUpdatedAt ? new Date(metricsQuery.dataUpdatedAt) : null;
 
   return (
-    <Layout linearOk={linearHealthy} openaiOk={Boolean(healthQuery.data?.openai)}>
+    <Layout linearOk={linearHealthy} openaiOk={Boolean(healthQuery.data?.openai)} lastRefreshed={lastRefreshed}>
       <Container size="xl" py="md">
-        {projectsQuery.isLoading ? (
+        {teamsQuery.isLoading ? (
           <Center h="60vh">
             <Loader />
           </Center>
         ) : (
           <>
             <FiltersBar
-              projects={projects}
+              teams={teams}
               filters={filters}
               onChangeFilters={setFilters}
-              projectId={projectId}
-              onSelectProject={setProjectId}
+              teamId={teamId}
+              onSelectTeam={setTeamId}
+              onClearFilters={() => setFilters(defaultFilters)}
               assignees={metricsQuery.data?.assignees || []}
-              onRefresh={() => metricsQuery.refetch()}
+              onRefresh={() => setShouldFetch(true)}
               loading={metricsQuery.isFetching}
+              disabled={filtersDisabled}
+              loadingMessage={
+                filtersDisabled ? 'Refreshing data and cache… filters are temporarily disabled.' : undefined
+              }
             />
             <MetricsDashboard metrics={metricsQuery.data?.metrics} loading={metricsQuery.isFetching} />
             <PromptChart
               loading={promptLoading}
               onGenerate={handlePrompt}
               result={promptResult}
-              disabled={!projectId}
+              disabled={!teamId}
             />
           </>
         )}

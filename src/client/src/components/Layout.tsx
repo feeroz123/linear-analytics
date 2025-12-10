@@ -22,12 +22,16 @@ type Props = {
   children: React.ReactNode;
   linearOk: boolean;
   openaiOk: boolean;
+  lastRefreshed?: Date | null;
 };
 
-export default function Layout({ children, linearOk, openaiOk }: Props) {
+export default function Layout({ children, linearOk, openaiOk, lastRefreshed }: Props) {
   const theme = useMantineTheme();
   const { toggleColorScheme } = useMantineColorScheme();
   const colorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
+  const refreshedLabel = lastRefreshed
+    ? `Last Refreshed: ${lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
+    : 'Last Refreshed: --:--';
 
   return (
     <AppShell
@@ -57,6 +61,9 @@ export default function Layout({ children, linearOk, openaiOk }: Props) {
             <Text fw={700}>Linear Analytics</Text>
             <StatusBadge label="Linear" ok={linearOk} />
             <StatusBadge label="OpenAI" ok={openaiOk} />
+            <Text size="sm" c="dimmed">
+              {refreshedLabel}
+            </Text>
           </Group>
           <ActionIcon variant="subtle" onClick={() => toggleColorScheme()} aria-label="Toggle theme">
             {colorScheme === 'light' ? <IconMoon size={18} /> : <IconSun size={18} />}

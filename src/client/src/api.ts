@@ -7,7 +7,7 @@ export type Filters = {
   endDate?: string;
 };
 
-export type Project = { id: string; name: string; team: { name: string } };
+export type Team = { id: string; name: string };
 
 export type MetricsResponse = {
   metrics: {
@@ -47,13 +47,13 @@ export async function fetchHealth() {
   return handle<{ linear: boolean; openai: boolean }>(res);
 }
 
-export async function fetchProjects() {
-  const res = await fetch('/api/projects', noStore);
-  return handle<{ projects: Project[]; lastProject: string | null; savedFilters: Filters | null }>(res);
+export async function fetchTeams() {
+  const res = await fetch('/api/teams', noStore);
+  return handle<{ teams: Team[]; lastTeam: string | null; savedFilters: Filters | null }>(res);
 }
 
-export async function fetchMetrics(projectId: string, filters: Filters) {
-  const params = new URLSearchParams({ projectId });
+export async function fetchMetrics(teamId: string, filters: Filters) {
+  const params = new URLSearchParams({ teamId });
   (Object.entries(filters) as [keyof Filters, any][]).forEach(([key, value]) => {
     if (value) params.set(key, value);
   });
@@ -61,12 +61,12 @@ export async function fetchMetrics(projectId: string, filters: Filters) {
   return handle<MetricsResponse>(res);
 }
 
-export async function generateChartFromPrompt(projectId: string, filters: Filters, prompt: string) {
+export async function generateChartFromPrompt(teamId: string, filters: Filters, prompt: string) {
   const res = await fetch('/api/chart-from-prompt', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     cache: 'no-store',
-    body: JSON.stringify({ projectId, filters, prompt }),
+    body: JSON.stringify({ teamId, filters, prompt }),
   });
   return handle<ChartDataResponse>(res);
 }

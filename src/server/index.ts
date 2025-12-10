@@ -45,12 +45,12 @@ fastify.get('/api/health', async () => {
   return { linear: linearOk, openai: status.openai };
 });
 
-fastify.get('/api/projects', async (request, reply) => {
+fastify.get('/api/teams', async (request, reply) => {
   if (!linearClient) return reply.badRequest('Missing LINEAR_API_KEY');
-  const projects = await linearClient.getProjects();
+  const teams = await linearClient.getTeams();
   status.linear = true;
   const state = getAppState();
-  return { projects, lastProject: state.lastProject, savedFilters: state.filters };
+  return { teams, lastTeam: state.lastProject, savedFilters: state.filters };
 });
 
 function parseFilters(params: Record<string, string | undefined>): Filters {
@@ -73,24 +73,26 @@ function parseFilters(params: Record<string, string | undefined>): Filters {
 fastify.get('/api/metrics', async (request, reply) => {
   if (!linearClient) return reply.badRequest('Missing LINEAR_API_KEY');
   const query = request.query as Record<string, string | undefined>;
-  const projectId = query.projectId;
-  if (!projectId) return reply.badRequest('projectId is required');
+  const teamId = query.teamId;
+  if (!teamId) return reply.badRequest('teamId is required');
 
   const filters = parseFilters(query);
-  const issues = await linearClient.getIssues(projectId);
+  const cachedIssues = await linearClient.getIssues(teamId, 100, true);
+  const issues = cachedIssues.length ? cachedIssues : await linearClient.getIssues(teamId);
   const metrics = buildMetrics(issues, filters);
-  saveAppState(projectId, filters);
+  saveAppState(teamId, filters);
 
   return { metrics, filters, assignees: metrics.assignees };
 });
 
 fastify.post('/api/chart-from-prompt', async (request, reply) => {
-  const body = request.body as { projectId?: string; filters?: Filters; prompt?: string };
+  const body = request.body as { teamId?: string; filters?: Filters; prompt?: string };
   if (!linearClient) return reply.badRequest('Missing LINEAR_API_KEY');
   if (!openaiKey) return reply.badRequest('Missing OPENAI_API_KEY');
-  if (!body.projectId || !body.prompt) return reply.badRequest('projectId and prompt are required');
+  if (!body.teamId || !body.prompt) return reply.badRequest('teamId and prompt are required');
 
-  const issues = await linearClient.getIssues(body.projectId);
+  const cachedIssues = await linearClient.getIssues(body.teamId, 100, true);
+  const issues = cachedIssues.length ? cachedIssues : await linearClient.getIssues(body.teamId);
   const baseFilters = body.filters ?? {};
   const spec = await generateChartSpec(openaiKey, body.prompt);
   const data = buildChartFromSpec(issues, baseFilters, spec);
