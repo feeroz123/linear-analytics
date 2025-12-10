@@ -23,9 +23,10 @@ type Props = {
   linearOk: boolean;
   openaiOk: boolean;
   lastRefreshed?: Date | null;
+  cacheInfo?: { count: number; from?: string; to?: string };
 };
 
-export default function Layout({ children, linearOk, openaiOk, lastRefreshed }: Props) {
+export default function Layout({ children, linearOk, openaiOk, lastRefreshed, cacheInfo }: Props) {
   const theme = useMantineTheme();
   const { toggleColorScheme } = useMantineColorScheme();
   const colorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
@@ -64,6 +65,11 @@ export default function Layout({ children, linearOk, openaiOk, lastRefreshed }: 
             <Text size="sm" c="dimmed">
               {refreshedLabel}
             </Text>
+            {cacheInfo && (
+              <Text size="sm" c="dimmed">
+                Cache: {cacheInfo.count} issues{cacheInfo.from && cacheInfo.to ? ` (${new Date(cacheInfo.from).toLocaleDateString()} – ${new Date(cacheInfo.to).toLocaleDateString()})` : ''}
+              </Text>
+            )}
           </Group>
           <ActionIcon variant="subtle" onClick={() => toggleColorScheme()} aria-label="Toggle theme">
             {colorScheme === 'light' ? <IconMoon size={18} /> : <IconSun size={18} />}

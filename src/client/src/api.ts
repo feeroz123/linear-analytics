@@ -19,6 +19,7 @@ export type MetricsResponse = {
   };
   filters: Filters;
   assignees: { id: string; name: string }[];
+  cacheInfo?: { count: number; from?: string; to?: string };
 };
 
 export type ChartDataResponse = {

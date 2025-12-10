@@ -24,9 +24,10 @@ type Props = {
   onGenerate: (prompt: string) => void;
   result: { spec: any; data: any } | null;
   disabled?: boolean;
+  usingCache?: boolean;
 };
 
-export default function PromptChart({ loading, onGenerate, result, disabled }: Props) {
+export default function PromptChart({ loading, onGenerate, result, disabled, usingCache }: Props) {
   const [prompt, setPrompt] = React.useState('Show bugs by assignee last 30 days');
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -43,6 +44,14 @@ export default function PromptChart({ loading, onGenerate, result, disabled }: P
           <Group justify="space-between">
             <Text fw={700}>Prompt → Chart</Text>
           </Group>
+          {usingCache && (
+            <Text
+              size="sm"
+              style={{ color: '#0b3d91', fontWeight: 700, fontStyle: 'italic' }}
+            >
+              Chart is based on cached issues. Click Refresh to fetch the latest data before generating.
+            </Text>
+          )}
           <Textarea
             label="Describe your chart"
             value={prompt}

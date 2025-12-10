@@ -82,7 +82,11 @@ fastify.get('/api/metrics', async (request, reply) => {
   const metrics = buildMetrics(issues, filters);
   saveAppState(teamId, filters);
 
-  return { metrics, filters, assignees: metrics.assignees };
+  const dates = issues.map((i) => i.createdAt).filter(Boolean).map((d) => new Date(d));
+  const from = dates.length ? new Date(Math.min(...dates.map((d) => d.getTime()))).toISOString() : undefined;
+  const to = dates.length ? new Date(Math.max(...dates.map((d) => d.getTime()))).toISOString() : undefined;
+
+  return { metrics, filters, assignees: metrics.assignees, cacheInfo: { count: issues.length, from, to } };
 });
 
 fastify.post('/api/chart-from-prompt', async (request, reply) => {

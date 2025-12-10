@@ -63,9 +63,15 @@ export default function App() {
   const linearHealthy = Boolean(healthQuery.data?.linear || teamsQuery.isSuccess);
   const filtersDisabled = teamsQuery.isFetching || metricsQuery.isFetching;
   const lastRefreshed = metricsQuery.dataUpdatedAt ? new Date(metricsQuery.dataUpdatedAt) : null;
+  const cacheInfo = metricsQuery.data?.cacheInfo;
 
   return (
-    <Layout linearOk={linearHealthy} openaiOk={Boolean(healthQuery.data?.openai)} lastRefreshed={lastRefreshed}>
+    <Layout
+      linearOk={linearHealthy}
+      openaiOk={Boolean(healthQuery.data?.openai)}
+      lastRefreshed={lastRefreshed}
+      cacheInfo={cacheInfo}
+    >
       <Container size="xl" py="md">
         {teamsQuery.isLoading ? (
           <Center h="60vh">
@@ -94,6 +100,7 @@ export default function App() {
               onGenerate={handlePrompt}
               result={promptResult}
               disabled={!teamId}
+              usingCache={true}
             />
           </>
         )}
