@@ -1,11 +1,11 @@
 import React from 'react';
 import { Container, Loader, Center } from '@mantine/core';
-import { useQuery } from '@tanstack/react-query';
-import { fetchHealth, fetchTeams, fetchMetrics, Filters, generateChartFromPrompt } from './api';
-import Layout from './components/Layout';
-import FiltersBar from './components/Filters';
-import MetricsDashboard from './components/MetricsDashboard';
-import PromptChart from './components/PromptChart';
+import { keepPreviousData, useQuery } from '@tanstack/react-query';
+import { fetchHealth, fetchTeams, fetchMetrics, Filters, generateChartFromPrompt } from './api.js';
+import Layout from './components/Layout.js';
+import FiltersBar from './components/Filters.js';
+import MetricsDashboard from './components/MetricsDashboard.js';
+import PromptChart from './components/PromptChart.js';
 
 const defaultFilters: Filters = { time: '7d' };
 
@@ -34,7 +34,7 @@ export default function App() {
     queryKey: ['metrics', teamId, filters, shouldFetch],
     queryFn: () => fetchMetrics(teamId!, filters),
     enabled: Boolean(teamId && shouldFetch),
-    keepPreviousData: true,
+    placeholderData: keepPreviousData,
   });
 
   const [promptResult, setPromptResult] = React.useState<{ spec: any; data: any } | null>(null);
@@ -84,6 +84,9 @@ export default function App() {
               creators={metricsQuery.data?.creators || []}
               cycles={metricsQuery.data?.cycles || []}
               states={metricsQuery.data?.states || []}
+              severities={metricsQuery.data?.severities || []}
+              priorities={metricsQuery.data?.priorities || []}
+              labels={metricsQuery.data?.labels || []}
               onRefresh={() => setShouldFetch(true)}
               loading={metricsQuery.isFetching}
               disabled={filtersDisabled}

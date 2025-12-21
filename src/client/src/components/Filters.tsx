@@ -1,7 +1,8 @@
-import { Card, Grid, Select, Button, Group, Text } from '@mantine/core';
+import React from 'react';
+import { Card, Grid, Select, Button, Group, Text, MultiSelect } from '@mantine/core';
 import { DateInput } from '@mantine/dates';
 import { IconRefresh } from '@tabler/icons-react';
-import { Filters, Team } from '../api';
+import { Filters, Team } from '../api.js';
 
 type Props = {
   teams: Team[];
@@ -13,6 +14,9 @@ type Props = {
   creators: { id: string; name: string }[];
   cycles: { id: string; name: string; number: number }[];
   states: string[];
+  severities: string[];
+  priorities: string[];
+  labels: string[];
   onRefresh: () => void;
   onClearFilters: () => void;
   loading?: boolean;
@@ -30,6 +34,9 @@ export default function FiltersBar({
   creators,
   cycles,
   states,
+  severities,
+  priorities,
+  labels,
   onRefresh,
   onClearFilters,
   loading,
@@ -39,6 +46,14 @@ export default function FiltersBar({
   const timeDisabled = disabled || Boolean(filters.startDate || filters.endDate) || Boolean(filters.cycleId);
   const dateDisabled = disabled || Boolean(filters.time) || Boolean(filters.cycleId);
   const cycleDisabled = disabled || Boolean(filters.time || filters.startDate || filters.endDate);
+  const prevDateDisabled = React.useRef(dateDisabled);
+
+  React.useEffect(() => {
+    if (prevDateDisabled.current && !dateDisabled && !filters.endDate) {
+      onChangeFilters({ ...filters, endDate: new Date().toISOString() });
+    }
+    prevDateDisabled.current = dateDisabled;
+  }, [dateDisabled, filters, onChangeFilters]);
 
   return (
     <Card withBorder shadow="sm" mb="md" radius="md">
@@ -101,6 +116,41 @@ export default function FiltersBar({
             onChange={(val) => onChangeFilters({ ...filters, type: val as Filters['type'] })}
             radius="md"
             disabled={disabled}
+          />
+        </Grid.Col>
+        <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>
+          <Select
+            label="Severity"
+            data={[{ value: '', label: 'Any' }, ...severities.map((sev) => ({ value: sev, label: sev }))]}
+            value={filters.severity || ''}
+            onChange={(val) => onChangeFilters({ ...filters, severity: val || undefined })}
+            searchable
+            radius="md"
+            disabled={disabled}
+          />
+        </Grid.Col>
+        <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>
+          <Select
+            label="Priority"
+            data={[{ value: '', label: 'Any' }, ...priorities.map((p) => ({ value: p, label: p }))]}
+            value={filters.priority || ''}
+            onChange={(val) => onChangeFilters({ ...filters, priority: val || undefined })}
+            searchable
+            radius="md"
+            disabled={disabled}
+          />
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+          <MultiSelect
+            label="Labels"
+            data={labels.map((label) => ({ value: label, label }))}
+            value={filters.labels || []}
+            onChange={(values) => onChangeFilters({ ...filters, labels: values })}
+            searchable
+            clearable
+            radius="md"
+            disabled={disabled}
+            placeholder="Select labels"
           />
         </Grid.Col>
         <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>

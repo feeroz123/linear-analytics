@@ -6,6 +6,7 @@ type LinearTeam = { id: string; name: string };
 type LinearProject = { id: string; name: string; team: { name: string } | null };
 type LinearState = { id: string; name: string; type: 'triage' | 'backlog' | 'started' | 'completed' | 'canceled' | string };
 type LinearLabel = { name: string };
+type LinearIssueNode = Omit<LinearIssue, 'labels'> & { labels?: { nodes?: LinearLabel[] } | null };
 export type LinearIssue = {
   id: string;
   title: string;
@@ -147,13 +148,13 @@ export class LinearClient {
 
     while (hasNextPage) {
       const data = await this.query<{
-        issues: { nodes: LinearIssue[]; pageInfo: { hasNextPage: boolean; endCursor: string } };
+        issues: { nodes: LinearIssueNode[]; pageInfo: { hasNextPage: boolean; endCursor: string } };
       }>(query, { teamId, first, after });
 
       const pageIssues = data.issues?.nodes ?? [];
-      const normalized = pageIssues.map((issue) => ({
+      const normalized = pageIssues.map((issue): LinearIssue => ({
         ...issue,
-        labels: (issue as any).labels?.nodes ?? [],
+        labels: issue.labels?.nodes ?? [],
       }));
       issues = issues.concat(normalized);
       const pageInfo = data.issues?.pageInfo;

@@ -21,14 +21,14 @@ Frontend: React 18 + Vite + TypeScript + Mantine UI (or shadcn/tailwind)Backend:
 
 3. **Default Metrics (Auto-update on filter change)**
 Metric | Chart | Data Source
-Throughput | Bar (weekly) | COUNT(issues WHERE completedAt IN timeframe)
-Open vs Closed | Donut | COUNT BY state.type (open/completed)
+Throughput | Bar (weekly) | COUNT(completed issues) grouped by completedAt week (filtered by createdAt)
+Issues by State | Donut | COUNT BY state.type
 Bugs/Assignee | Horizontal Bar | COUNT(type=“bug”) GROUP BY assignee
 Bugs: Severity/Priority | Stacked Bar | COUNT(type=“bug”) GROUP BY severity, priority
 
 
 4. **Filters (All required)**
-   - Time: Any or Last 7/30/90 days (from `createdAt`/`updatedAt`)
+   - Time: Any or Last 7/30/90 days (from `createdAt` only)
    - Start Date + End Date (inclusive)
    - Cycle: Any / [dropdown of cycles from issues]
    - State: Any / [dropdown of Linear state.type values]  

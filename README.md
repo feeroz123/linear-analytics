@@ -20,4 +20,4 @@ Backend runs Fastify + Linear/OpenAI clients and embeds Vite dev middleware for 
 - Pagination for issues
 - Keeps filter/team selection in SQLite
 - Mantine dark/light toggle
-- Filters include time (7/30/90/any), state.type, type, assignee, creator, cycle, and optional start/end date (time/date/cycle are mutually exclusive)
+- Filters include time (7/30/90/any, based on createdAt), state.type, type, assignee, creator, cycle, and optional start/end date (time/date/cycle are mutually exclusive)

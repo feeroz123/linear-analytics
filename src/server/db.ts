@@ -9,6 +9,9 @@ export type SavedFilters = {
   assigneeId?: string;
   creatorId?: string;
   cycleId?: string;
+  severity?: string;
+  priority?: string;
+  labels?: string[];
   startDate?: string;
   endDate?: string;
 };

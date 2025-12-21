@@ -85,12 +85,12 @@ function computeChartTotal(spec: any, data: any): number | null {
 
   if (spec.type === 'pie' || spec.type === 'donut') {
     if (!Array.isArray(data)) return null;
-    return data.reduce((sum, row) => sum + (Number(row.value) || 0), 0);
+    return data.reduce((sum: number, row: { value?: number }) => sum + (Number(row.value) || 0), 0);
   }
 
   if (spec.type === 'scatter') {
     const rows = Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : [];
-    return rows.reduce((sum, row) => sum + (Number(row.y) || 0), 0);
+    return rows.reduce((sum: number, row: { y?: number }) => sum + (Number(row.y) || 0), 0);
   }
 
   const rows = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
@@ -99,12 +99,15 @@ function computeChartTotal(spec: any, data: any): number | null {
   const groupedKeys = Array.isArray(data.grouped) && data.grouped.length ? data.grouped : null;
   if (groupedKeys) {
     return rows.reduce((sum, row) => {
-      const rowTotal = groupedKeys.reduce((rowSum: number, key: string) => rowSum + (Number(row[key]) || 0), 0);
+      const rowTotal = groupedKeys.reduce(
+        (rowSum: number, key: string) => rowSum + (Number((row as Record<string, unknown>)[key]) || 0),
+        0,
+      );
       return sum + rowTotal;
-    }, 0);
+    }, 0 as number);
   }
 
-  return rows.reduce((sum, row) => sum + (Number(row.value) || 0), 0);
+  return rows.reduce((sum: number, row: { value?: number }) => sum + (Number(row.value) || 0), 0);
 }
 
 function DynamicChart({ spec, data }: { spec: any; data: any }) {

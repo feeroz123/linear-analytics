@@ -60,6 +60,9 @@ function parseFilters(params: Record<string, string | undefined>): Filters {
   const assigneeId = params.assigneeId || undefined;
   const creatorId = params.creatorId || undefined;
   const cycleId = params.cycleId || undefined;
+  const severity = params.severity || undefined;
+  const priority = params.priority || undefined;
+  const labels = params.labels ? params.labels.split(',').filter(Boolean) : undefined;
   const startDate = params.startDate;
   const endDate = params.endDate;
   return {
@@ -69,6 +72,9 @@ function parseFilters(params: Record<string, string | undefined>): Filters {
     assigneeId,
     creatorId,
     cycleId,
+    severity,
+    priority,
+    labels,
     startDate: startDate || undefined,
     endDate: endDate || undefined,
   };
@@ -97,6 +103,9 @@ fastify.get('/api/metrics', async (request, reply) => {
     creators: metrics.creators,
     cycles: metrics.cycles,
     states: metrics.states,
+    severities: metrics.severities,
+    priorities: metrics.priorities,
+    labels: metrics.labels,
     cacheInfo: { count: issues.length, from, to },
   };
 });
@@ -127,6 +136,9 @@ function applySpecFilter(filters: Filters, filterString?: string): Filters {
     if (key === 'assignee') extra.assigneeId = val;
     if (key === 'creator') extra.creatorId = val;
     if (key === 'cycle') extra.cycleId = val;
+    if (key === 'severity') extra.severity = val;
+    if (key === 'priority') extra.priority = val;
+    if (key === 'labels') extra.labels = val.split(',').filter(Boolean);
   });
   return extra;
 }
@@ -140,7 +152,21 @@ function bucketFromSpec(issue: any, axis: ChartSpec['xAxis']): string {
       return `${year}-W${String(week).padStart(2, '0')}`;
     }
     case 'priority':
-      return typeof issue.priority === 'number' ? `P${issue.priority}` : 'Unprioritized';
+      if (typeof issue.priority !== 'number') return 'No Priority';
+      switch (issue.priority) {
+        case 0:
+          return 'Urgent';
+        case 1:
+          return 'High';
+        case 2:
+          return 'Medium';
+        case 3:
+          return 'Low';
+        case 4:
+          return 'No Priority';
+        default:
+          return `P${issue.priority}`;
+      }
     case 'assignee':
       return issue.assignee?.name || 'Unassigned';
     case 'creator':
@@ -161,7 +187,21 @@ function bucketFromSpec(issue: any, axis: ChartSpec['xAxis']): string {
 function groupFromSpec(issue: any, group: NonNullable<Exclude<ChartSpec['groupBy'], 'null'>>): string {
   switch (group) {
     case 'priority':
-      return typeof issue.priority === 'number' ? `P${issue.priority}` : 'Unprioritized';
+      if (typeof issue.priority !== 'number') return 'No Priority';
+      switch (issue.priority) {
+        case 0:
+          return 'Urgent';
+        case 1:
+          return 'High';
+        case 2:
+          return 'Medium';
+        case 3:
+          return 'Low';
+        case 4:
+          return 'No Priority';
+        default:
+          return `P${issue.priority}`;
+      }
     case 'team':
       return issue.team?.name || 'Unknown';
     case 'severity': {

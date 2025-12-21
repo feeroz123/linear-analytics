@@ -69,6 +69,56 @@ function matchesType(issue: LinearIssue, type?: Filters['type']): boolean {
   return inferIssueType(issue) === type;
 }
 
+function severityLabel(issue: LinearIssue): string {
+  const label = (issue.labels ?? []).find((l) => {
+    const name = l.name.toLowerCase();
+    return name.includes('severity') || name.startsWith('sev');
+  })?.name;
+  if (!label) return 'Unknown';
+  const normalized = label.toLowerCase();
+  if (normalized.includes('critical')) return 'Critical';
+  if (normalized.includes('major')) return 'Major';
+  if (normalized.includes('minor')) return 'Minor';
+  if (normalized.includes('trivial')) return 'Trivial';
+  const parts = label.split(':');
+  if (parts.length > 1) return parts[1].trim();
+  return label;
+}
+
+function priorityLabel(issue: LinearIssue): string {
+  if (typeof issue.priority !== 'number') return 'No Priority';
+  switch (issue.priority) {
+    case 0:
+      return 'Urgent';
+    case 1:
+      return 'High';
+    case 2:
+      return 'Medium';
+    case 3:
+      return 'Low';
+    case 4:
+      return 'No Priority';
+    default:
+      return `P${issue.priority}`;
+  }
+}
+
+function matchesSeverity(issue: LinearIssue, severity?: string): boolean {
+  if (!severity || severity === 'all') return true;
+  return severityLabel(issue) === severity;
+}
+
+function matchesPriority(issue: LinearIssue, priority?: string): boolean {
+  if (!priority || priority === 'all') return true;
+  return priorityLabel(issue) === priority;
+}
+
+function matchesLabels(issue: LinearIssue, labels?: string[]): boolean {
+  if (!labels || labels.length === 0) return true;
+  const issueLabels = (issue.labels ?? []).map((label) => label.name.toLowerCase());
+  return labels.some((label) => issueLabels.includes(label.toLowerCase()));
+}
+
 export function filterIssues(issues: LinearIssue[], filters: Filters): LinearIssue[] {
   return issues.filter(
     (issue) =>
@@ -77,6 +127,9 @@ export function filterIssues(issues: LinearIssue[], filters: Filters): LinearIss
       matchesAssignee(issue, filters.assigneeId) &&
       matchesCreator(issue, filters.creatorId) &&
       matchesCycle(issue, filters.cycleId) &&
+      matchesSeverity(issue, filters.severity) &&
+      matchesPriority(issue, filters.priority) &&
+      matchesLabels(issue, filters.labels) &&
       matchesType(issue, filters.type),
   );
 }
@@ -109,9 +162,10 @@ function computeThroughput(issues: LinearIssue[]) {
 }
 
 
-function computeOpenVsClosed(issues: LinearIssue[]) {
+function computeBugsByState(issues: LinearIssue[]) {
   const counts = new Map<string, number>();
   issues.forEach((issue) => {
+    if (inferIssueType(issue) !== 'bug') return;
     const status = issue.state?.type || 'unknown';
     counts.set(status, (counts.get(status) ?? 0) + 1);
   });
@@ -142,12 +196,43 @@ function computeSeverityPriority(issues: LinearIssue[]) {
   issues
     .filter((i) => inferIssueType(i) === 'bug')
     .forEach((issue) => {
-      const severityLabel = (issue.labels ?? []).find((l) => l.name.toLowerCase().includes('sev'))?.name || 'Unknown';
-      const priorityValue = typeof issue.priority === 'number' ? `P${issue.priority}` : 'Unprioritized';
-      pushRow(severityLabel, priorityValue);
+      pushRow(severityLabel(issue), priorityLabel(issue));
     });
 
   return rows;
+}
+
+function computeBugsBySeverity(issues: LinearIssue[]) {
+  const counts = new Map<string, number>();
+  issues
+    .filter((i) => inferIssueType(i) === 'bug')
+    .forEach((issue) => {
+      const label = severityLabel(issue);
+      counts.set(label, (counts.get(label) ?? 0) + 1);
+    });
+  return Array.from(counts.entries())
+    .map(([name, count]) => ({ name, count }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function collectSeverities(issues: LinearIssue[]) {
+  const set = new Set<string>();
+  issues.forEach((issue) => set.add(severityLabel(issue)));
+  return Array.from(set.values()).sort((a, b) => a.localeCompare(b));
+}
+
+function collectPriorities(issues: LinearIssue[]) {
+  const set = new Set<string>();
+  issues.forEach((issue) => set.add(priorityLabel(issue)));
+  return Array.from(set.values()).sort((a, b) => a.localeCompare(b));
+}
+
+function collectLabels(issues: LinearIssue[]) {
+  const set = new Set<string>();
+  issues.forEach((issue) => {
+    (issue.labels ?? []).forEach((label) => set.add(label.name));
+  });
+  return Array.from(set.values()).sort((a, b) => a.localeCompare(b));
 }
 
 function collectAssignees(issues: LinearIssue[]) {
@@ -192,12 +277,16 @@ export function buildMetrics(issues: LinearIssue[], filters: Filters) {
   const scopedIssues = filterIssues(issues, filters);
   return {
     throughput: computeThroughput(scopedIssues),
-    openVsClosed: computeOpenVsClosed(scopedIssues),
+    openVsClosed: computeBugsByState(scopedIssues),
     bugsByAssignee: computeBugsByAssignee(scopedIssues),
+    bugsBySeverity: computeBugsBySeverity(scopedIssues),
     bugsBySeverityPriority: computeSeverityPriority(scopedIssues),
     assignees: collectAssignees(issues),
     creators: collectCreators(issues),
     cycles: collectCycles(issues),
     states: collectStates(issues),
+    severities: collectSeverities(issues),
+    priorities: collectPriorities(issues),
+    labels: collectLabels(issues),
   };
 }

@@ -5,6 +5,9 @@ export type Filters = {
   assigneeId?: string;
   creatorId?: string;
   cycleId?: string;
+  severity?: string;
+  priority?: string;
+  labels?: string[];
   startDate?: string;
   endDate?: string;
 };
@@ -16,17 +19,24 @@ export type MetricsResponse = {
     throughput: { week: string; count: number }[];
     openVsClosed: { name: string; value: number }[];
     bugsByAssignee: { name: string; count: number }[];
+    bugsBySeverity: { name: string; count: number }[];
     bugsBySeverityPriority: { severity: string; priority: string; count: number }[];
     assignees: { id: string; name: string }[];
     creators: { id: string; name: string }[];
     cycles: { id: string; name: string; number: number }[];
     states: string[];
+    severities: string[];
+    priorities: string[];
+    labels: string[];
   };
   filters: Filters;
   assignees: { id: string; name: string }[];
   creators: { id: string; name: string }[];
   cycles: { id: string; name: string; number: number }[];
   states: string[];
+  severities: string[];
+  priorities: string[];
+  labels: string[];
   cacheInfo?: { count: number; from?: string; to?: string };
 };
 
@@ -64,6 +74,10 @@ export async function fetchTeams() {
 export async function fetchMetrics(teamId: string, filters: Filters) {
   const params = new URLSearchParams({ teamId });
   (Object.entries(filters) as [keyof Filters, any][]).forEach(([key, value]) => {
+    if (Array.isArray(value)) {
+      if (value.length) params.set(key, value.join(','));
+      return;
+    }
     if (value) params.set(key, value);
   });
   const res = await fetch(`/api/metrics?${params.toString()}`, noStore);

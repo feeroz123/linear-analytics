@@ -30,6 +30,7 @@ type Metrics = {
   throughput: { week: string; count: number }[];
   openVsClosed: { name: string; value: number }[];
   bugsByAssignee: { name: string; count: number }[];
+  bugsBySeverity: { name: string; count: number }[];
   bugsBySeverityPriority: { severity: string; priority: string; count: number }[];
 };
 
@@ -77,6 +78,7 @@ export default function MetricsDashboard({ metrics, loading }: Props) {
   const throughputTotal = metrics ? metrics.throughput.reduce((sum, row) => sum + row.count, 0) : 0;
   const openClosedTotal = metrics ? metrics.openVsClosed.reduce((sum, row) => sum + row.value, 0) : 0;
   const bugsAssigneeTotal = metrics ? metrics.bugsByAssignee.reduce((sum, row) => sum + row.count, 0) : 0;
+  const bugsSeverityOnlyTotal = metrics ? metrics.bugsBySeverity.reduce((sum, row) => sum + row.count, 0) : 0;
   const bugsSeverityTotal = metrics ? metrics.bugsBySeverityPriority.reduce((sum, row) => sum + row.count, 0) : 0;
 
   return (
@@ -86,12 +88,16 @@ export default function MetricsDashboard({ metrics, loading }: Props) {
       </Text>
       <Stack gap="md">
         <ChartCard
-          title={`Throughput (weekly) ${metrics ? `· ${formatTotal(throughputTotal)}` : ''}`}
-          tooltip="Completed issues grouped by week based on completedAt."
+          title={`Throughput (All Tickets: Weekly distribution) ${metrics ? `· ${formatTotal(throughputTotal)}` : ''}`}
+          tooltip="Completed Tickets grouped by week based on completedAt."
           loading={loading}
           onExpand={
             metrics && metrics.throughput.length
-              ? () => openModal('Throughput (weekly)', <BarChartFull data={metrics.throughput} color={palette[0]} height={360} />)
+              ? () =>
+                  openModal(
+                    'Throughput (All Tickets: Weekly distribution)',
+                    <BarChartFull data={metrics.throughput} color={palette[0]} height={360} />,
+                  )
               : undefined
           }
         >
@@ -101,12 +107,12 @@ export default function MetricsDashboard({ metrics, loading }: Props) {
         <Grid gutter="md">
           <Grid.Col span={{ base: 12, md: 4 }}>
             <ChartCard
-              title={`Issues by State ${metrics ? `· ${formatTotal(openClosedTotal)}` : ''}`}
-              tooltip="Distribution of issues by Linear state type."
+              title={`Bugs by State ${metrics ? `· ${formatTotal(openClosedTotal)}` : ''}`}
+              tooltip="Distribution of bug issues by Linear state type."
               loading={loading}
               onExpand={
                 metrics && metrics.openVsClosed.length
-                  ? () => openModal('Open vs Closed', <PieChartFull data={metrics.openVsClosed} palette={palette} height={320} />)
+                  ? () => openModal('Bugs by State', <PieChartFull data={metrics.openVsClosed} palette={palette} height={320} />)
                   : undefined
               }
             >
@@ -135,14 +141,14 @@ export default function MetricsDashboard({ metrics, loading }: Props) {
 
           <Grid.Col span={{ base: 12, md: 4 }}>
             <ChartCard
-              title={`Bugs: Severity / Priority ${metrics ? `· ${formatTotal(bugsSeverityTotal)}` : ''}`}
-              tooltip="Bug counts grouped by severity label and priority."
+              title={`Bugs by Priority ${metrics ? `· ${formatTotal(bugsSeverityTotal)}` : ''}`}
+              tooltip="Bug counts grouped by priority."
               loading={loading}
               onExpand={
                 metrics && metrics.bugsBySeverityPriority.length
                   ? () =>
                       openModal(
-                        'Bugs: Severity / Priority',
+                        'Bugs by Priority',
                         <BarSeverity data={metrics.bugsBySeverityPriority} palette={palette} height={320} />,
                       )
                   : undefined
@@ -150,6 +156,29 @@ export default function MetricsDashboard({ metrics, loading }: Props) {
             >
               {loading ? skeleton : metrics && metrics.bugsBySeverityPriority.length ? (
                 <BarSeverity data={metrics.bugsBySeverityPriority} palette={palette} height={200} />
+              ) : (
+                <EmptyState />
+              )}
+            </ChartCard>
+          </Grid.Col>
+
+          <Grid.Col span={{ base: 12, md: 4 }}>
+            <ChartCard
+              title={`Bugs by Severity ${metrics ? `· ${formatTotal(bugsSeverityOnlyTotal)}` : ''}`}
+              tooltip="Bug counts grouped by severity."
+              loading={loading}
+              onExpand={
+                metrics && metrics.bugsBySeverity.length
+                  ? () =>
+                      openModal(
+                        'Bugs by Severity',
+                        <BarCategory data={metrics.bugsBySeverity} color={palette[3]} height={320} />,
+                      )
+                  : undefined
+              }
+            >
+              {loading ? skeleton : metrics && metrics.bugsBySeverity.length ? (
+                <BarCategory data={metrics.bugsBySeverity} color={palette[3]} height={200} />
               ) : (
                 <EmptyState />
               )}
@@ -288,6 +317,35 @@ function BarAssignee({
   );
 }
 
+function BarCategory({
+  data,
+  color,
+  height,
+}: {
+  data: { name: string; count: number }[];
+  color: string;
+  height: number;
+}) {
+  return (
+    <div style={{ width: '100%', height }}>
+      <ResponsiveContainer>
+        <BarChart data={data} layout="vertical" margin={{ left: 20, bottom: 12 }}>
+          <XAxis type="number" allowDecimals={false} />
+          <YAxis dataKey="name" type="category" width={100} tickMargin={8} />
+          <Tooltip />
+          <Legend
+            layout="horizontal"
+            verticalAlign="bottom"
+            align="center"
+            wrapperStyle={{ paddingTop: 4 }}
+          />
+          <Bar dataKey="count" fill={color} radius={4} />
+        </BarChart>
+      </ResponsiveContainer>
+    </div>
+  );
+}
+
 function BarSeverity({
   data,
   palette,
@@ -297,29 +355,24 @@ function BarSeverity({
   palette: string[];
   height: number;
 }) {
-  const severities = Array.from(new Set(data.map((b) => b.severity)));
+  const grouped = data.reduce<Record<string, { priority: string; count: number }>>((acc, row) => {
+    if (!acc[row.priority]) acc[row.priority] = { priority: row.priority, count: 0 };
+    acc[row.priority].count += row.count;
+    return acc;
+  }, {});
+  const chartData = Object.values(grouped);
   return (
     <div style={{ width: '100%', height }}>
       <ResponsiveContainer>
-        <BarChart data={data} margin={{ bottom: 16 }}>
-          <XAxis dataKey="priority" tickMargin={6} />
-          <YAxis allowDecimals={false} />
-          <Tooltip />
-          <Legend
-            layout="horizontal"
-            verticalAlign="bottom"
-            align="center"
-            wrapperStyle={{ paddingTop: 8 }}
+        <BarChart data={chartData} margin={{ bottom: 24 }}>
+          <XAxis
+            dataKey="priority"
+            tickMargin={6}
+            label={{ value: 'Priority', position: 'insideBottom', offset: -6 }}
           />
-          {severities.map((sev, idx) => (
-            <Bar
-              key={sev}
-              dataKey={(d) => (d.severity === sev ? d.count : 0)}
-              name={sev}
-              fill={palette[idx % palette.length]}
-              radius={4}
-            />
-          ))}
+          <YAxis allowDecimals={false} label={{ value: 'Count', angle: -90, position: 'insideLeft' }} />
+          <Tooltip />
+          <Bar dataKey="count" name="Count" fill={palette[0]} radius={4} />
         </BarChart>
       </ResponsiveContainer>
     </div>
