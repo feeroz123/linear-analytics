@@ -8,6 +8,7 @@ export type Filters = {
   severity?: string;
   priority?: string;
   labels?: string[];
+  projectId?: string;
   startDate?: string;
   endDate?: string;
 };
@@ -49,8 +50,21 @@ export type ChartDataResponse = {
     xAxis: string;
     yAxis: string;
     groupBy?: string | null;
+    filter?: string;
   };
   data: any;
+};
+
+export type IssueRow = {
+  id: string;
+  title: string;
+  type: 'bug' | 'feature' | 'chore' | 'other';
+  creator: string;
+  assignee: string;
+  createdAt: string;
+  status: string;
+  severity: string;
+  priority: string;
 };
 
 async function handle<T>(res: Response): Promise<T> {
@@ -94,4 +108,21 @@ export async function generateChartFromPrompt(teamId: string, filters: Filters, 
     body: JSON.stringify({ teamId, filters, prompt }),
   });
   return handle<ChartDataResponse>(res);
+}
+
+export async function fetchIssuesForChart(payload: {
+  teamId: string;
+  filters: Filters;
+  chart: 'throughput' | 'bugsByState' | 'bugsByAssignee' | 'bugsByPriority' | 'bugsBySeverity' | 'prompt';
+  bucket: string;
+  series?: string;
+  spec?: ChartDataResponse['spec'];
+}) {
+  const res = await fetch('/api/issues-for-chart', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
+    body: JSON.stringify(payload),
+  });
+  return handle<{ issues: IssueRow[] }>(res);
 }

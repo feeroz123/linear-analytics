@@ -26,9 +26,10 @@ type Props = {
   result: { spec: any; data: any } | null;
   disabled?: boolean;
   usingCache?: boolean;
+  onChartClick?: (payload: { bucket: string; series?: string; spec: any; title: string }) => void;
 };
 
-export default function PromptChart({ loading, onGenerate, result, disabled, usingCache }: Props) {
+export default function PromptChart({ loading, onGenerate, result, disabled, usingCache, onChartClick }: Props) {
   const [prompt, setPrompt] = React.useState('Show bugs by assignee last 30 days');
   const total = result ? computeChartTotal(result.spec, result.data) : null;
   const totalLabel = total !== null ? `· ${total.toLocaleString()}` : '';
@@ -73,7 +74,18 @@ export default function PromptChart({ loading, onGenerate, result, disabled, usi
               Generate a chart to see results.
             </Text>
           ) : (
-            <DynamicChart spec={result!.spec} data={result!.data} />
+            <DynamicChart
+              spec={result!.spec}
+              data={result!.data}
+              onChartClick={(bucket, series) =>
+                onChartClick?.({
+                  bucket,
+                  series,
+                  spec: result!.spec,
+                  title: `${result!.spec?.title || 'Prompt Chart'} · ${bucket}${series ? ` · ${series}` : ''}`,
+                })
+              }
+            />
           )}
         </Stack>
       </form>
@@ -111,13 +123,28 @@ function computeChartTotal(spec: any, data: any): number | null {
   return rows.reduce((sum: number, row: { value?: number }) => sum + (Number(row.value) || 0), 0);
 }
 
-function DynamicChart({ spec, data }: { spec: any; data: any }) {
+function DynamicChart({
+  spec,
+  data,
+  onChartClick,
+}: {
+  spec: any;
+  data: any;
+  onChartClick?: (bucket: string, series?: string) => void;
+}) {
   if (!data) return null;
 
   const renderPie = () => (
     <ResponsiveContainer height={280}>
       <PieChart>
-        <Pie data={data} dataKey="value" nameKey="name" outerRadius={100} label>
+        <Pie
+          data={data}
+          dataKey="value"
+          nameKey="name"
+          outerRadius={100}
+          label
+          onClick={(entry) => onChartClick?.(entry?.name)}
+        >
           {data.map((_: any, idx: number) => (
             <Cell key={idx} fill={palette[idx % palette.length]} />
           ))}
@@ -140,13 +167,26 @@ function DynamicChart({ spec, data }: { spec: any; data: any }) {
             <Tooltip />
             <Legend />
             {seriesKeys.map((key, idx) => (
-              <Bar key={key} dataKey={key} name={key} fill={palette[idx % palette.length]} radius={4}>
+              <Bar
+                key={key}
+                dataKey={key}
+                name={key}
+                fill={palette[idx % palette.length]}
+                radius={4}
+                onClick={(entry) => onChartClick?.(entry?.payload?.x, key === 'value' ? undefined : key)}
+              >
                 <LabelList dataKey={key} position="top" />
               </Bar>
             ))}
           </BarChart>
         ) : (
-          <LineChart data={rows}>
+          <LineChart
+            data={rows}
+            onClick={(state) => {
+              const payload = state?.activePayload?.[0]?.payload;
+              if (payload?.x) onChartClick?.(payload.x);
+            }}
+          >
             <XAxis dataKey="x" />
             <YAxis />
             <Tooltip />
@@ -162,7 +202,12 @@ function DynamicChart({ spec, data }: { spec: any; data: any }) {
 
   const renderScatter = () => (
     <ResponsiveContainer height={300}>
-      <ScatterChart>
+      <ScatterChart
+        onClick={(state) => {
+          const payload = state?.activePayload?.[0]?.payload;
+          if (payload?.x) onChartClick?.(payload.x);
+        }}
+      >
         <XAxis dataKey="x" />
         <YAxis dataKey="y" />
         <Tooltip />

@@ -38,6 +38,11 @@ type Metrics = {
 type Props = {
   metrics?: Metrics;
   loading?: boolean;
+  onChartClick?: (payload: {
+    chart: 'throughput' | 'bugsByState' | 'bugsByAssignee' | 'bugsByPriority' | 'bugsBySeverity';
+    bucket: string;
+    title: string;
+  }) => void;
 };
 
 const skeleton = <Skeleton height={160} radius="md" />;
@@ -60,7 +65,7 @@ function EmptyState() {
   );
 }
 
-export default function MetricsDashboard({ metrics, loading }: Props) {
+export default function MetricsDashboard({ metrics, loading, onChartClick }: Props) {
   const theme = useMantineTheme();
   const colorScheme = useComputedColorScheme('light');
   const palette =
@@ -102,7 +107,22 @@ export default function MetricsDashboard({ metrics, loading }: Props) {
               : undefined
           }
         >
-          {loading ? skeleton : metrics && metrics.throughput.length ? <BarChartFull data={metrics.throughput} color={palette[0]} height={240} /> : <EmptyState />}
+          {loading ? skeleton : metrics && metrics.throughput.length ? (
+            <BarChartFull
+              data={metrics.throughput}
+              color={palette[0]}
+              height={240}
+              onBarClick={(week) =>
+                onChartClick?.({
+                  chart: 'throughput',
+                  bucket: week,
+                  title: `Throughput (All Tickets: Weekly distribution) · ${week}`,
+                })
+              }
+            />
+          ) : (
+            <EmptyState />
+          )}
         </ChartCard>
 
         <Grid gutter="md">
@@ -118,7 +138,19 @@ export default function MetricsDashboard({ metrics, loading }: Props) {
               }
             >
               {loading ? skeleton : metrics && metrics.openVsClosed.length ? (
-                <PieChartFull data={metrics.openVsClosed} palette={palette} height={200} shrink={0.5} />
+                <PieChartFull
+                  data={metrics.openVsClosed}
+                  palette={palette}
+                  height={200}
+                  shrink={0.5}
+                  onSliceClick={(name) =>
+                    onChartClick?.({
+                      chart: 'bugsByState',
+                      bucket: name,
+                      title: `Bugs by State · ${name}`,
+                    })
+                  }
+                />
               ) : (
                 <EmptyState />
               )}
@@ -136,7 +168,22 @@ export default function MetricsDashboard({ metrics, loading }: Props) {
                   : undefined
               }
             >
-              {loading ? skeleton : metrics && metrics.bugsByAssignee.length ? <BarAssignee data={metrics.bugsByAssignee} color={palette[2]} height={200} /> : <EmptyState />}
+              {loading ? skeleton : metrics && metrics.bugsByAssignee.length ? (
+                <BarAssignee
+                  data={metrics.bugsByAssignee}
+                  color={palette[2]}
+                  height={200}
+                  onBarClick={(name) =>
+                    onChartClick?.({
+                      chart: 'bugsByAssignee',
+                      bucket: name,
+                      title: `Bugs / Assignee · ${name}`,
+                    })
+                  }
+                />
+              ) : (
+                <EmptyState />
+              )}
             </ChartCard>
           </Grid.Col>
 
@@ -156,7 +203,18 @@ export default function MetricsDashboard({ metrics, loading }: Props) {
               }
             >
               {loading ? skeleton : metrics && metrics.bugsBySeverityPriority.length ? (
-                <BarSeverity data={metrics.bugsBySeverityPriority} palette={palette} height={200} />
+                <BarSeverity
+                  data={metrics.bugsBySeverityPriority}
+                  palette={palette}
+                  height={200}
+                  onBarClick={(priority) =>
+                    onChartClick?.({
+                      chart: 'bugsByPriority',
+                      bucket: priority,
+                      title: `Bugs by Priority · ${priority}`,
+                    })
+                  }
+                />
               ) : (
                 <EmptyState />
               )}
@@ -179,7 +237,18 @@ export default function MetricsDashboard({ metrics, loading }: Props) {
               }
             >
               {loading ? skeleton : metrics && metrics.bugsBySeverity.length ? (
-                <BarCategory data={metrics.bugsBySeverity} color={palette[3]} height={200} />
+                <BarCategory
+                  data={metrics.bugsBySeverity}
+                  color={palette[3]}
+                  height={200}
+                  onBarClick={(severity) =>
+                    onChartClick?.({
+                      chart: 'bugsBySeverity',
+                      bucket: severity,
+                      title: `Bugs by Severity · ${severity}`,
+                    })
+                  }
+                />
               ) : (
                 <EmptyState />
               )}
@@ -236,10 +305,12 @@ function BarChartFull({
   data,
   color,
   height,
+  onBarClick,
 }: {
   data: { week: string; count: number }[];
   color: string;
   height: number;
+  onBarClick?: (week: string) => void;
 }) {
   return (
     <div style={{ width: '100%', height }}>
@@ -248,7 +319,12 @@ function BarChartFull({
           <XAxis dataKey="week" angle={-20} textAnchor="end" height={60} tickMargin={10} interval={0} />
           <YAxis allowDecimals={false} />
           <Tooltip />
-          <Bar dataKey="count" fill={color} radius={4}>
+          <Bar
+            dataKey="count"
+            fill={color}
+            radius={4}
+            onClick={(entry) => onBarClick?.(entry?.payload?.week)}
+          >
             <LabelList dataKey="count" position="top" />
           </Bar>
         </BarChart>
@@ -262,18 +338,26 @@ function PieChartFull({
   palette,
   height,
   shrink,
+  onSliceClick,
 }: {
   data: { name: string; value: number }[];
   palette: string[];
   height: number;
   shrink?: number;
+  onSliceClick?: (name: string) => void;
 }) {
   const factor = shrink ?? 0.9;
   return (
     <div style={{ width: '100%', height }}>
       <ResponsiveContainer>
         <PieChart>
-          <Pie dataKey="value" data={data} outerRadius={Math.min(120, height / 2) * factor} label>
+          <Pie
+            dataKey="value"
+            data={data}
+            outerRadius={Math.min(120, height / 2) * factor}
+            label
+            onClick={(entry) => onSliceClick?.(entry?.name)}
+          >
             {data.map((_, i) => (
               <Cell key={i} fill={palette[i % palette.length]} />
             ))}
@@ -295,10 +379,12 @@ function BarAssignee({
   data,
   color,
   height,
+  onBarClick,
 }: {
   data: { name: string; count: number }[];
   color: string;
   height: number;
+  onBarClick?: (name: string) => void;
 }) {
   return (
     <div style={{ width: '100%', height }}>
@@ -313,7 +399,12 @@ function BarAssignee({
             align="center"
             wrapperStyle={{ paddingTop: 4 }}
           />
-          <Bar dataKey="count" fill={color} radius={4}>
+          <Bar
+            dataKey="count"
+            fill={color}
+            radius={4}
+            onClick={(entry) => onBarClick?.(entry?.payload?.name)}
+          >
             <LabelList dataKey="count" position="right" />
           </Bar>
         </BarChart>
@@ -326,10 +417,12 @@ function BarCategory({
   data,
   color,
   height,
+  onBarClick,
 }: {
   data: { name: string; count: number }[];
   color: string;
   height: number;
+  onBarClick?: (name: string) => void;
 }) {
   const severityColors: Record<string, string> = {
     Critical: '#e03131',
@@ -359,7 +452,7 @@ function BarCategory({
             content={(props) => <LegendWithLabel label={legendTitle} {...props} />}
             wrapperStyle={{ paddingTop: 4 }}
           />
-          <Bar dataKey="count" name="Count" radius={4}>
+          <Bar dataKey="count" name="Count" radius={4} onClick={(entry) => onBarClick?.(entry?.payload?.name)}>
             {data.map((row) => (
               <Cell key={row.name} fill={severityColors[row.name] || color} />
             ))}
@@ -375,10 +468,12 @@ function BarSeverity({
   data,
   palette,
   height,
+  onBarClick,
 }: {
   data: { severity: string; priority: string; count: number }[];
   palette: string[];
   height: number;
+  onBarClick?: (priority: string) => void;
 }) {
   const grouped = data.reduce<Record<string, { priority: string; count: number }>>((acc, row) => {
     if (!acc[row.priority]) acc[row.priority] = { priority: row.priority, count: 0 };
@@ -414,7 +509,12 @@ function BarSeverity({
             content={(props) => <LegendWithLabel label={legendTitle} {...props} />}
             wrapperStyle={{ paddingTop: 8 }}
           />
-          <Bar dataKey="count" name="Count" radius={4}>
+          <Bar
+            dataKey="count"
+            name="Count"
+            radius={4}
+            onClick={(entry) => onBarClick?.(entry?.payload?.priority)}
+          >
             {chartData.map((row) => (
               <Cell key={row.priority} fill={priorityColors[row.priority] || palette[5] || palette[0]} />
             ))}

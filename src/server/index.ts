@@ -8,7 +8,7 @@ import { config as loadEnv } from 'dotenv';
 import { createServer as createViteServer } from 'vite';
 
 import { LinearClient } from './linear.js';
-import { buildMetrics, filterIssues, Filters } from './metrics.js';
+import { buildMetrics, filterIssues, Filters, inferIssueType, priorityLabel, severityLabel, weekLabel } from './metrics.js';
 import { getAppState, saveAppState } from './db.js';
 import { generateChartSpec, ChartSpec } from './openai.js';
 import { registerNoCacheHook } from './hooks.js';
@@ -126,6 +126,93 @@ fastify.post('/api/chart-from-prompt', async (request, reply) => {
   const data = buildChartFromSpec(issues, baseFilters, spec);
 
   return { spec, data };
+});
+
+type IssueRow = {
+  id: string;
+  title: string;
+  type: ReturnType<typeof inferIssueType>;
+  creator: string;
+  assignee: string;
+  createdAt: string;
+  status: string;
+  severity: string;
+  priority: string;
+};
+
+fastify.post('/api/issues-for-chart', async (request, reply) => {
+  const body = request.body as {
+    teamId?: string;
+    filters?: Filters;
+    chart?: 'throughput' | 'bugsByState' | 'bugsByAssignee' | 'bugsByPriority' | 'bugsBySeverity' | 'prompt';
+    bucket?: string;
+    series?: string;
+    spec?: ChartSpec;
+  };
+  if (!linearClient) return reply.badRequest('Missing LINEAR_API_KEY');
+  if (!body.teamId || !body.chart || !body.bucket) return reply.badRequest('teamId, chart, and bucket are required');
+
+  const cachedIssues = await linearClient.getIssues(body.teamId, 100, true);
+  const issues = cachedIssues.length ? cachedIssues : await linearClient.getIssues(body.teamId);
+  const baseFilters = body.filters ?? {};
+  const scoped = filterIssues(issues, baseFilters);
+
+  const filterByChart = () => {
+    switch (body.chart) {
+      case 'throughput':
+        return scoped.filter((issue) => {
+          if (!issue.completedAt) return false;
+          return weekLabel(new Date(issue.completedAt)) === body.bucket;
+        });
+      case 'bugsByState':
+        return scoped.filter(
+          (issue) => inferIssueType(issue) === 'bug' && (issue.state?.type || 'unknown') === body.bucket,
+        );
+      case 'bugsByAssignee':
+        return scoped.filter(
+          (issue) => inferIssueType(issue) === 'bug' && (issue.assignee?.name || 'Unassigned') === body.bucket,
+        );
+      case 'bugsByPriority':
+        return scoped.filter(
+          (issue) => inferIssueType(issue) === 'bug' && priorityLabel(issue) === body.bucket,
+        );
+      case 'bugsBySeverity':
+        return scoped.filter(
+          (issue) => inferIssueType(issue) === 'bug' && severityLabel(issue) === body.bucket,
+        );
+      case 'prompt': {
+        const spec = body.spec;
+        if (!spec) return [];
+        const mergedFilters = applySpecFilter(baseFilters, spec.filter);
+        const promptScoped = filterIssues(issues, mergedFilters);
+        const grouped = spec.groupBy && spec.groupBy !== 'null';
+        return promptScoped.filter((issue) => {
+          const bucket = bucketFromSpec(issue, spec.xAxis);
+          if (bucket !== body.bucket) return false;
+          if (!grouped) return true;
+          const groupKey = groupFromSpec(issue, spec.groupBy as any);
+          return groupKey === body.series;
+        });
+      }
+      default:
+        return scoped;
+    }
+  };
+
+  const filtered = filterByChart();
+  const rows: IssueRow[] = filtered.map((issue) => ({
+    id: issue.id,
+    title: issue.title,
+    type: inferIssueType(issue),
+    creator: issue.creator?.name || 'Unknown',
+    assignee: issue.assignee?.name || 'Unassigned',
+    createdAt: issue.createdAt,
+    status: issue.state?.type || 'unknown',
+    severity: severityLabel(issue),
+    priority: priorityLabel(issue),
+  }));
+
+  return { issues: rows };
 });
 
 function applySpecFilter(filters: Filters, filterString?: string): Filters {

@@ -1,7 +1,7 @@
 import React from 'react';
-import { Container, Loader, Center } from '@mantine/core';
+import { Container, Loader, Center, Modal, Table, ScrollArea, Text } from '@mantine/core';
 import { keepPreviousData, useQuery } from '@tanstack/react-query';
-import { fetchHealth, fetchTeams, fetchMetrics, Filters, generateChartFromPrompt } from './api.js';
+import { fetchHealth, fetchTeams, fetchMetrics, Filters, generateChartFromPrompt, fetchIssuesForChart, IssueRow } from './api.js';
 import Layout from './components/Layout.js';
 import FiltersBar from './components/Filters.js';
 import MetricsDashboard from './components/MetricsDashboard.js';
@@ -45,6 +45,11 @@ export default function App() {
 
   const [promptResult, setPromptResult] = React.useState<{ spec: any; data: any } | null>(null);
   const [promptLoading, setPromptLoading] = React.useState(false);
+  const [issuesModal, setIssuesModal] = React.useState<{ open: boolean; title: string; issues: IssueRow[] }>({
+    open: false,
+    title: '',
+    issues: [],
+  });
   const handlePrompt = async (prompt: string) => {
     if (!teamId) return;
     setPromptLoading(true);
@@ -55,6 +60,32 @@ export default function App() {
       console.error(err);
     } finally {
       setPromptLoading(false);
+    }
+  };
+
+  const openIssuesModal = (title: string, issues: IssueRow[]) => setIssuesModal({ open: true, title, issues });
+  const closeIssuesModal = () => setIssuesModal({ open: false, title: '', issues: [] });
+
+  const handleChartClick = async (payload: {
+    chart: 'throughput' | 'bugsByState' | 'bugsByAssignee' | 'bugsByPriority' | 'bugsBySeverity' | 'prompt';
+    bucket: string;
+    series?: string;
+    spec?: any;
+    title: string;
+  }) => {
+    if (!teamId) return;
+    try {
+      const result = await fetchIssuesForChart({
+        teamId,
+        filters,
+        chart: payload.chart,
+        bucket: payload.bucket,
+        series: payload.series,
+        spec: payload.spec,
+      });
+      openIssuesModal(payload.title, result.issues);
+    } catch (err) {
+      console.error(err);
     }
   };
 
@@ -101,17 +132,70 @@ export default function App() {
                 filtersDisabled ? 'Refreshing data and cache… filters are temporarily disabled.' : undefined
               }
             />
-            <MetricsDashboard metrics={metricsQuery.data?.metrics} loading={metricsQuery.isFetching} />
+            <MetricsDashboard
+              metrics={metricsQuery.data?.metrics}
+              loading={metricsQuery.isFetching}
+              onChartClick={handleChartClick}
+            />
             <PromptChart
               loading={promptLoading}
               onGenerate={handlePrompt}
               result={promptResult}
               disabled={!teamId}
               usingCache={true}
+              onChartClick={(payload) =>
+                handleChartClick({
+                  chart: 'prompt',
+                  bucket: payload.bucket,
+                  series: payload.series,
+                  spec: payload.spec,
+                  title: payload.title,
+                })
+              }
             />
           </>
         )}
       </Container>
+      <Modal opened={issuesModal.open} onClose={closeIssuesModal} title={issuesModal.title} size="xl" centered>
+        {issuesModal.issues.length ? (
+          <ScrollArea h={360}>
+            <Table striped highlightOnHover>
+              <Table.Thead>
+                <Table.Tr>
+                  <Table.Th>Issue ID</Table.Th>
+                  <Table.Th>Issue Title</Table.Th>
+                  <Table.Th>Type</Table.Th>
+                  <Table.Th>Creator</Table.Th>
+                  <Table.Th>Assignee</Table.Th>
+                  <Table.Th>Created On</Table.Th>
+                  <Table.Th>Status</Table.Th>
+                  <Table.Th>Severity</Table.Th>
+                  <Table.Th>Priority</Table.Th>
+                </Table.Tr>
+              </Table.Thead>
+              <Table.Tbody>
+                {issuesModal.issues.map((issue) => (
+                  <Table.Tr key={issue.id}>
+                    <Table.Td>{issue.id}</Table.Td>
+                    <Table.Td>{issue.title}</Table.Td>
+                    <Table.Td>{issue.type}</Table.Td>
+                    <Table.Td>{issue.creator}</Table.Td>
+                    <Table.Td>{issue.assignee}</Table.Td>
+                    <Table.Td>{new Date(issue.createdAt).toLocaleDateString()}</Table.Td>
+                    <Table.Td>{issue.status}</Table.Td>
+                    <Table.Td>{issue.severity}</Table.Td>
+                    <Table.Td>{issue.priority}</Table.Td>
+                  </Table.Tr>
+                ))}
+              </Table.Tbody>
+            </Table>
+          </ScrollArea>
+        ) : (
+          <Text size="sm" c="dimmed">
+            No issues found for this selection.
+          </Text>
+        )}
+      </Modal>
     </Layout>
   );
 }

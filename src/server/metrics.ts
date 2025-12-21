@@ -69,7 +69,7 @@ function matchesType(issue: LinearIssue, type?: Filters['type']): boolean {
   return inferIssueType(issue) === type;
 }
 
-function severityLabel(issue: LinearIssue): string {
+export function severityLabel(issue: LinearIssue): string {
   const labels = issue.labels ?? [];
   const directMatch = labels.find((l) => {
     const name = l.name.toLowerCase().trim();
@@ -98,7 +98,7 @@ function severityLabel(issue: LinearIssue): string {
   return label;
 }
 
-function priorityLabel(issue: LinearIssue): string {
+export function priorityLabel(issue: LinearIssue): string {
   if (typeof issue.priority !== 'number') return 'No Priority';
   switch (issue.priority) {
     case 0:
@@ -153,7 +153,7 @@ export function filterIssues(issues: LinearIssue[], filters: Filters): LinearIss
   );
 }
 
-function weekLabel(date: Date) {
+export function weekLabel(date: Date) {
   const year = date.getUTCFullYear();
   const week = getWeekNumber(date);
   return `${year}-W${String(week).padStart(2, '0')}`;
