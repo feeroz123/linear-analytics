@@ -12,6 +12,7 @@ export type SavedFilters = {
   severity?: string;
   priority?: string;
   labels?: string[];
+  projectId?: string;
   startDate?: string;
   endDate?: string;
 };

@@ -28,6 +28,7 @@ export type MetricsResponse = {
     severities: string[];
     priorities: string[];
     labels: string[];
+    projects: { id: string; name: string }[];
   };
   filters: Filters;
   assignees: { id: string; name: string }[];
@@ -37,6 +38,7 @@ export type MetricsResponse = {
   severities: string[];
   priorities: string[];
   labels: string[];
+  projects: { id: string; name: string }[];
   cacheInfo?: { count: number; from?: string; to?: string };
 };
 

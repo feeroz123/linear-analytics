@@ -70,7 +70,20 @@ function matchesType(issue: LinearIssue, type?: Filters['type']): boolean {
 }
 
 function severityLabel(issue: LinearIssue): string {
-  const label = (issue.labels ?? []).find((l) => {
+  const labels = issue.labels ?? [];
+  const directMatch = labels.find((l) => {
+    const name = l.name.toLowerCase().trim();
+    return name === 'critical' || name === 'major' || name === 'minor' || name === 'trivial';
+  })?.name;
+  if (directMatch) {
+    const normalized = directMatch.toLowerCase();
+    if (normalized === 'critical') return 'Critical';
+    if (normalized === 'major') return 'Major';
+    if (normalized === 'minor') return 'Minor';
+    if (normalized === 'trivial') return 'Trivial';
+  }
+
+  const label = labels.find((l) => {
     const name = l.name.toLowerCase();
     return name.includes('severity') || name.startsWith('sev');
   })?.name;
@@ -113,6 +126,11 @@ function matchesPriority(issue: LinearIssue, priority?: string): boolean {
   return priorityLabel(issue) === priority;
 }
 
+function matchesProject(issue: LinearIssue, projectId?: string): boolean {
+  if (!projectId) return true;
+  return issue.project?.id === projectId;
+}
+
 function matchesLabels(issue: LinearIssue, labels?: string[]): boolean {
   if (!labels || labels.length === 0) return true;
   const issueLabels = (issue.labels ?? []).map((label) => label.name.toLowerCase());
@@ -129,6 +147,7 @@ export function filterIssues(issues: LinearIssue[], filters: Filters): LinearIss
       matchesCycle(issue, filters.cycleId) &&
       matchesSeverity(issue, filters.severity) &&
       matchesPriority(issue, filters.priority) &&
+      matchesProject(issue, filters.projectId) &&
       matchesLabels(issue, filters.labels) &&
       matchesType(issue, filters.type),
   );
@@ -273,6 +292,16 @@ function collectStates(issues: LinearIssue[]) {
   return Array.from(set.values()).sort((a, b) => a.localeCompare(b));
 }
 
+function collectProjects(issues: LinearIssue[]) {
+  const map = new Map<string, string>();
+  issues.forEach((issue) => {
+    if (issue.project) {
+      map.set(issue.project.id, issue.project.name);
+    }
+  });
+  return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+}
+
 export function buildMetrics(issues: LinearIssue[], filters: Filters) {
   const scopedIssues = filterIssues(issues, filters);
   return {
@@ -288,5 +317,6 @@ export function buildMetrics(issues: LinearIssue[], filters: Filters) {
     severities: collectSeverities(issues),
     priorities: collectPriorities(issues),
     labels: collectLabels(issues),
+    projects: collectProjects(issues),
   };
 }

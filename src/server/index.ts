@@ -63,6 +63,7 @@ function parseFilters(params: Record<string, string | undefined>): Filters {
   const severity = params.severity || undefined;
   const priority = params.priority || undefined;
   const labels = params.labels ? params.labels.split(',').filter(Boolean) : undefined;
+  const projectId = params.projectId || undefined;
   const startDate = params.startDate;
   const endDate = params.endDate;
   return {
@@ -75,6 +76,7 @@ function parseFilters(params: Record<string, string | undefined>): Filters {
     severity,
     priority,
     labels,
+    projectId,
     startDate: startDate || undefined,
     endDate: endDate || undefined,
   };
@@ -106,6 +108,7 @@ fastify.get('/api/metrics', async (request, reply) => {
     severities: metrics.severities,
     priorities: metrics.priorities,
     labels: metrics.labels,
+    projects: metrics.projects,
     cacheInfo: { count: issues.length, from, to },
   };
 });
@@ -139,6 +142,7 @@ function applySpecFilter(filters: Filters, filterString?: string): Filters {
     if (key === 'severity') extra.severity = val;
     if (key === 'priority') extra.priority = val;
     if (key === 'labels') extra.labels = val.split(',').filter(Boolean);
+    if (key === 'projectId') extra.projectId = val;
   });
   return extra;
 }

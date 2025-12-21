@@ -17,6 +17,7 @@ type Props = {
   severities: string[];
   priorities: string[];
   labels: string[];
+  projects: { id: string; name: string }[];
   onRefresh: () => void;
   onClearFilters: () => void;
   loading?: boolean;
@@ -37,6 +38,7 @@ export default function FiltersBar({
   severities,
   priorities,
   labels,
+  projects,
   onRefresh,
   onClearFilters,
   loading,
@@ -58,13 +60,24 @@ export default function FiltersBar({
   return (
     <Card withBorder shadow="sm" mb="md" radius="md">
       <Grid gutter="sm" align="end">
-        <Grid.Col span={{ base: 12, sm: 4, md: 3 }}>
+        <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
           <Select
             label="Team"
             data={teams.map((t) => ({ value: t.id, label: t.name }))}
             placeholder="Select team"
             value={teamId}
             onChange={(val) => val && onSelectTeam(val)}
+            searchable
+            radius="md"
+            disabled={disabled}
+          />
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+          <Select
+            label="Project"
+            data={[{ value: '', label: 'Any' }, ...projects.map((p) => ({ value: p.id, label: p.name }))]}
+            value={filters.projectId || ''}
+            onChange={(val) => onChangeFilters({ ...filters, projectId: val || undefined })}
             searchable
             radius="md"
             disabled={disabled}

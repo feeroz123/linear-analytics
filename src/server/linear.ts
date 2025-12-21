@@ -20,6 +20,7 @@ export type LinearIssue = {
   priority?: number | null;
   labels?: LinearLabel[] | null;
   team?: { name: string } | null;
+  project?: { id: string; name: string } | null;
   estimate?: number | null;
   cycle?: { id: string; number: number; name: string } | null;
 };
@@ -139,6 +140,7 @@ export class LinearClient {
           priority
           labels { nodes { name } }
           team { name }
+          project { id name }
           estimate
           cycle { id number name }
         }

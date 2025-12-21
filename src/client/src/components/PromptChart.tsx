@@ -15,6 +15,7 @@ import {
   ScatterChart,
   Scatter,
   Legend,
+  LabelList,
 } from 'recharts';
 
 const palette = ['#1f78ff', '#4dabf7', '#f59f00', '#ff6b6b', '#15aabf', '#845ef7'];
@@ -139,7 +140,9 @@ function DynamicChart({ spec, data }: { spec: any; data: any }) {
             <Tooltip />
             <Legend />
             {seriesKeys.map((key, idx) => (
-              <Bar key={key} dataKey={key} name={key} fill={palette[idx % palette.length]} radius={4} />
+              <Bar key={key} dataKey={key} name={key} fill={palette[idx % palette.length]} radius={4}>
+                <LabelList dataKey={key} position="top" />
+              </Bar>
             ))}
           </BarChart>
         ) : (

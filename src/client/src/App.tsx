@@ -27,6 +27,12 @@ export default function App() {
   }, [teamsQuery.data, teamId]);
 
   React.useEffect(() => {
+    if (!teamId) return;
+    setFilters((prev) => ({ ...prev, projectId: undefined }));
+    setShouldFetch(true);
+  }, [teamId]);
+
+  React.useEffect(() => {
     if (filters.cycleId) setShouldFetch(true);
   }, [filters.cycleId]);
 
@@ -87,6 +93,7 @@ export default function App() {
               severities={metricsQuery.data?.severities || []}
               priorities={metricsQuery.data?.priorities || []}
               labels={metricsQuery.data?.labels || []}
+              projects={metricsQuery.data?.projects || []}
               onRefresh={() => setShouldFetch(true)}
               loading={metricsQuery.isFetching}
               disabled={filtersDisabled}

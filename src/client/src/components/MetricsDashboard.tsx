@@ -22,6 +22,7 @@ import {
   Pie,
   Cell,
   Legend,
+  LabelList,
 } from 'recharts';
 import { IconMaximize, IconInfoCircle } from '@tabler/icons-react';
 import { Tooltip as MantineTooltip } from '@mantine/core';
@@ -124,7 +125,7 @@ export default function MetricsDashboard({ metrics, loading }: Props) {
             </ChartCard>
           </Grid.Col>
 
-          <Grid.Col span={{ base: 12, md: 4 }}>
+          <Grid.Col span={{ base: 12, md: 8 }}>
             <ChartCard
               title={`Bugs / Assignee ${metrics ? `· ${formatTotal(bugsAssigneeTotal)}` : ''}`}
               tooltip="Count of bug-type issues per assignee."
@@ -139,7 +140,7 @@ export default function MetricsDashboard({ metrics, loading }: Props) {
             </ChartCard>
           </Grid.Col>
 
-          <Grid.Col span={{ base: 12, md: 4 }}>
+          <Grid.Col span={{ base: 12, md: 6 }}>
             <ChartCard
               title={`Bugs by Priority ${metrics ? `· ${formatTotal(bugsSeverityTotal)}` : ''}`}
               tooltip="Bug counts grouped by priority."
@@ -162,7 +163,7 @@ export default function MetricsDashboard({ metrics, loading }: Props) {
             </ChartCard>
           </Grid.Col>
 
-          <Grid.Col span={{ base: 12, md: 4 }}>
+          <Grid.Col span={{ base: 12, md: 6 }}>
             <ChartCard
               title={`Bugs by Severity ${metrics ? `· ${formatTotal(bugsSeverityOnlyTotal)}` : ''}`}
               tooltip="Bug counts grouped by severity."
@@ -247,7 +248,9 @@ function BarChartFull({
           <XAxis dataKey="week" angle={-20} textAnchor="end" height={60} tickMargin={10} interval={0} />
           <YAxis allowDecimals={false} />
           <Tooltip />
-          <Bar dataKey="count" fill={color} radius={4} />
+          <Bar dataKey="count" fill={color} radius={4}>
+            <LabelList dataKey="count" position="top" />
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -310,7 +313,9 @@ function BarAssignee({
             align="center"
             wrapperStyle={{ paddingTop: 4 }}
           />
-          <Bar dataKey="count" fill={color} radius={4} />
+          <Bar dataKey="count" fill={color} radius={4}>
+            <LabelList dataKey="count" position="right" />
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -326,20 +331,40 @@ function BarCategory({
   color: string;
   height: number;
 }) {
+  const severityColors: Record<string, string> = {
+    Critical: '#e03131',
+    Major: '#f08c00',
+    Minor: '#fab005',
+    Trivial: '#2f9e44',
+    Unknown: color,
+  };
+  const legendPayload = data.map((row) => ({
+    value: row.name,
+    color: severityColors[row.name] || color,
+    type: 'square' as const,
+  }));
+  const legendTitle = 'Severity';
   return (
     <div style={{ width: '100%', height }}>
       <ResponsiveContainer>
-        <BarChart data={data} layout="vertical" margin={{ left: 20, bottom: 12 }}>
-          <XAxis type="number" allowDecimals={false} />
-          <YAxis dataKey="name" type="category" width={100} tickMargin={8} />
+        <BarChart data={data} margin={{ bottom: 16 }}>
+          <XAxis dataKey="name" tickMargin={6} />
+          <YAxis allowDecimals={false} label={{ value: 'Count', angle: -90, position: 'insideLeft' }} />
           <Tooltip />
           <Legend
             layout="horizontal"
             verticalAlign="bottom"
             align="center"
+            payload={legendPayload}
+            content={(props) => <LegendWithLabel label={legendTitle} {...props} />}
             wrapperStyle={{ paddingTop: 4 }}
           />
-          <Bar dataKey="count" fill={color} radius={4} />
+          <Bar dataKey="count" name="Count" radius={4}>
+            {data.map((row) => (
+              <Cell key={row.name} fill={severityColors[row.name] || color} />
+            ))}
+            <LabelList dataKey="count" position="top" />
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
     </div>
@@ -361,20 +386,71 @@ function BarSeverity({
     return acc;
   }, {});
   const chartData = Object.values(grouped);
+  const priorityColors: Record<string, string> = {
+    Urgent: palette[2],
+    High: palette[3],
+    Medium: palette[1],
+    Low: palette[0],
+    'No Priority': palette[4],
+  };
+  const legendPayload = chartData.map((row) => ({
+    value: row.priority,
+    color: priorityColors[row.priority] || palette[5] || palette[0],
+    type: 'square' as const,
+  }));
+  const legendTitle = 'Priority';
   return (
     <div style={{ width: '100%', height }}>
       <ResponsiveContainer>
         <BarChart data={chartData} margin={{ bottom: 24 }}>
-          <XAxis
-            dataKey="priority"
-            tickMargin={6}
-            label={{ value: 'Priority', position: 'insideBottom', offset: -6 }}
-          />
+          <XAxis dataKey="priority" tickMargin={6} />
           <YAxis allowDecimals={false} label={{ value: 'Count', angle: -90, position: 'insideLeft' }} />
           <Tooltip />
-          <Bar dataKey="count" name="Count" fill={palette[0]} radius={4} />
+          <Legend
+            layout="horizontal"
+            verticalAlign="bottom"
+            align="center"
+            payload={legendPayload}
+            content={(props) => <LegendWithLabel label={legendTitle} {...props} />}
+            wrapperStyle={{ paddingTop: 8 }}
+          />
+          <Bar dataKey="count" name="Count" radius={4}>
+            {chartData.map((row) => (
+              <Cell key={row.priority} fill={priorityColors[row.priority] || palette[5] || palette[0]} />
+            ))}
+            <LabelList dataKey="count" position="top" />
+          </Bar>
         </BarChart>
       </ResponsiveContainer>
+    </div>
+  );
+}
+
+function LegendWithLabel({
+  label,
+  payload,
+}: {
+  label: string;
+  payload?: { value: string; color: string }[];
+}) {
+  if (!payload || payload.length === 0) return null;
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+      <span style={{ fontWeight: 700 }}>{label}</span>
+      {payload.map((entry) => (
+        <span key={entry.value} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+          <span
+            style={{
+              display: 'inline-block',
+              width: 10,
+              height: 10,
+              backgroundColor: entry.color,
+              borderRadius: 2,
+            }}
+          />
+          <span>{entry.value}</span>
+        </span>
+      ))}
     </div>
   );
 }
