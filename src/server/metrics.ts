@@ -33,25 +33,35 @@ function withinTime(issue: LinearIssue, filters: Filters): boolean {
   if (filters.startDate) start = new Date(filters.startDate);
   if (filters.endDate) end = new Date(filters.endDate);
 
-  const timestamps = [issue.createdAt, issue.updatedAt, issue.completedAt].filter(Boolean).map((t) => new Date(t!));
-  return timestamps.some((t) => {
-    if (start && t < start) return false;
-    if (end && t > end) return false;
-    return true;
-  });
+  const reference = new Date(issue.createdAt);
+  if (start && reference < start) return false;
+  if (end && reference > end) return false;
+  return true;
 }
 
 function matchesState(issue: LinearIssue, state?: Filters['state']): boolean {
   if (!state || state === 'all') return true;
-  const type = issue.state?.type || (issue.completedAt ? 'completed' : 'open');
-  if (state === 'open') return type !== 'completed';
-  if (state === 'completed') return type === 'completed';
-  return true;
+  const type = issue.state?.type;
+  return type ? type === state : false;
 }
 
 function matchesAssignee(issue: LinearIssue, assigneeId?: string): boolean {
   if (!assigneeId) return true;
-  return issue.assignee?.id === assigneeId;
+  if (!issue.assignee) return false;
+  const needle = assigneeId.toLowerCase();
+  return issue.assignee.id === assigneeId || issue.assignee.name.toLowerCase().includes(needle);
+}
+
+function matchesCreator(issue: LinearIssue, creatorId?: string): boolean {
+  if (!creatorId) return true;
+  if (!issue.creator) return false;
+  const needle = creatorId.toLowerCase();
+  return issue.creator.id === creatorId || issue.creator.name.toLowerCase().includes(needle);
+}
+
+function matchesCycle(issue: LinearIssue, cycleId?: string): boolean {
+  if (!cycleId) return true;
+  return issue.cycle?.id === cycleId;
 }
 
 function matchesType(issue: LinearIssue, type?: Filters['type']): boolean {
@@ -65,6 +75,8 @@ export function filterIssues(issues: LinearIssue[], filters: Filters): LinearIss
       withinTime(issue, filters) &&
       matchesState(issue, filters.state) &&
       matchesAssignee(issue, filters.assigneeId) &&
+      matchesCreator(issue, filters.creatorId) &&
+      matchesCycle(issue, filters.cycleId) &&
       matchesType(issue, filters.type),
   );
 }
@@ -96,18 +108,16 @@ function computeThroughput(issues: LinearIssue[]) {
     .sort((a, b) => a.week.localeCompare(b.week));
 }
 
+
 function computeOpenVsClosed(issues: LinearIssue[]) {
-  let open = 0;
-  let closed = 0;
+  const counts = new Map<string, number>();
   issues.forEach((issue) => {
-    const status = issue.state?.type || (issue.completedAt ? 'completed' : 'open');
-    if (status === 'completed') closed += 1;
-    else open += 1;
+    const status = issue.state?.type || 'unknown';
+    counts.set(status, (counts.get(status) ?? 0) + 1);
   });
-  return [
-    { name: 'Open', value: open },
-    { name: 'Closed', value: closed },
-  ];
+  return Array.from(counts.entries())
+    .map(([name, value]) => ({ name, value }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function computeBugsByAssignee(issues: LinearIssue[]) {
@@ -150,6 +160,34 @@ function collectAssignees(issues: LinearIssue[]) {
   return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
 }
 
+function collectCreators(issues: LinearIssue[]) {
+  const map = new Map<string, string>();
+  issues.forEach((issue) => {
+    if (issue.creator) {
+      map.set(issue.creator.id, issue.creator.name);
+    }
+  });
+  return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+}
+
+function collectCycles(issues: LinearIssue[]) {
+  const map = new Map<string, { name: string; number: number }>();
+  issues.forEach((issue) => {
+    if (issue.cycle) {
+      map.set(issue.cycle.id, { name: issue.cycle.name, number: issue.cycle.number });
+    }
+  });
+  return Array.from(map.entries()).map(([id, info]) => ({ id, ...info }));
+}
+
+function collectStates(issues: LinearIssue[]) {
+  const set = new Set<string>();
+  issues.forEach((issue) => {
+    if (issue.state?.type) set.add(issue.state.type);
+  });
+  return Array.from(set.values()).sort((a, b) => a.localeCompare(b));
+}
+
 export function buildMetrics(issues: LinearIssue[], filters: Filters) {
   const scopedIssues = filterIssues(issues, filters);
   return {
@@ -158,5 +196,8 @@ export function buildMetrics(issues: LinearIssue[], filters: Filters) {
     bugsByAssignee: computeBugsByAssignee(scopedIssues),
     bugsBySeverityPriority: computeSeverityPriority(scopedIssues),
     assignees: collectAssignees(issues),
+    creators: collectCreators(issues),
+    cycles: collectCycles(issues),
+    states: collectStates(issues),
   };
 }

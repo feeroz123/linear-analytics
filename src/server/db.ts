@@ -4,9 +4,11 @@ import fs from 'node:fs';
 
 export type SavedFilters = {
   time?: '7d' | '30d' | '90d';
-  state?: 'all' | 'open' | 'completed';
+  state?: string;
   type?: 'all' | 'bug' | 'feature' | 'chore';
   assigneeId?: string;
+  creatorId?: string;
+  cycleId?: string;
   startDate?: string;
   endDate?: string;
 };

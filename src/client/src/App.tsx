@@ -7,7 +7,7 @@ import FiltersBar from './components/Filters';
 import MetricsDashboard from './components/MetricsDashboard';
 import PromptChart from './components/PromptChart';
 
-const defaultFilters: Filters = {};
+const defaultFilters: Filters = { time: '7d' };
 
 export default function App() {
   const [teamId, setTeamId] = React.useState<string | null>(null);
@@ -26,19 +26,13 @@ export default function App() {
     }
   }, [teamsQuery.data, teamId]);
 
-  const enforcedFilters = React.useMemo(
-    () => ({
-      ...filters,
-      time: '7d',
-      startDate: undefined,
-      endDate: undefined,
-    }),
-    [filters],
-  );
+  React.useEffect(() => {
+    if (filters.cycleId) setShouldFetch(true);
+  }, [filters.cycleId]);
 
   const metricsQuery = useQuery({
-    queryKey: ['metrics', teamId, enforcedFilters, shouldFetch],
-    queryFn: () => fetchMetrics(teamId!, enforcedFilters),
+    queryKey: ['metrics', teamId, filters, shouldFetch],
+    queryFn: () => fetchMetrics(teamId!, filters),
     enabled: Boolean(teamId && shouldFetch),
     keepPreviousData: true,
   });
@@ -49,7 +43,7 @@ export default function App() {
     if (!teamId) return;
     setPromptLoading(true);
     try {
-      const result = await generateChartFromPrompt(teamId, enforcedFilters, prompt);
+      const result = await generateChartFromPrompt(teamId, filters, prompt);
       setPromptResult(result);
     } catch (err) {
       console.error(err);
@@ -87,6 +81,9 @@ export default function App() {
               onSelectTeam={setTeamId}
               onClearFilters={() => setFilters(defaultFilters)}
               assignees={metricsQuery.data?.assignees || []}
+              creators={metricsQuery.data?.creators || []}
+              cycles={metricsQuery.data?.cycles || []}
+              states={metricsQuery.data?.states || []}
               onRefresh={() => setShouldFetch(true)}
               loading={metricsQuery.isFetching}
               disabled={filtersDisabled}

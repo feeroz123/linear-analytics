@@ -10,6 +10,9 @@ type Props = {
   teamId: string | null;
   onSelectTeam: (id: string) => void;
   assignees: { id: string; name: string }[];
+  creators: { id: string; name: string }[];
+  cycles: { id: string; name: string; number: number }[];
+  states: string[];
   onRefresh: () => void;
   onClearFilters: () => void;
   loading?: boolean;
@@ -24,14 +27,18 @@ export default function FiltersBar({
   teamId,
   onSelectTeam,
   assignees,
+  creators,
+  cycles,
+  states,
   onRefresh,
   onClearFilters,
   loading,
   disabled,
   loadingMessage,
 }: Props) {
-  const timeDisabled = disabled || Boolean(filters.startDate || filters.endDate);
-  const dateDisabled = disabled || Boolean(filters.time);
+  const timeDisabled = disabled || Boolean(filters.startDate || filters.endDate) || Boolean(filters.cycleId);
+  const dateDisabled = disabled || Boolean(filters.time) || Boolean(filters.cycleId);
+  const cycleDisabled = disabled || Boolean(filters.time || filters.startDate || filters.endDate);
 
   return (
     <Card withBorder shadow="sm" mb="md" radius="md">
@@ -52,12 +59,21 @@ export default function FiltersBar({
           <Select
             label="Time"
             data={[
+              { value: '', label: 'Any' },
               { value: '7d', label: 'Last 7 days' },
               { value: '30d', label: 'Last 30 days' },
               { value: '90d', label: 'Last 90 days' },
             ]}
-            value={filters.time}
-            onChange={(val) => onChangeFilters({ ...filters, time: val as Filters['time'] })}
+            value={filters.time || ''}
+            onChange={(val) =>
+              onChangeFilters({
+                ...filters,
+                time: val ? (val as Filters['time']) : undefined,
+                startDate: undefined,
+                endDate: undefined,
+                cycleId: undefined,
+              })
+            }
             radius="md"
             disabled={timeDisabled}
           />
@@ -65,13 +81,9 @@ export default function FiltersBar({
         <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>
           <Select
             label="State"
-            data={[
-              { value: 'all', label: 'All' },
-              { value: 'open', label: 'Open' },
-              { value: 'completed', label: 'Completed' },
-            ]}
-            value={filters.state || 'all'}
-            onChange={(val) => onChangeFilters({ ...filters, state: val as Filters['state'] })}
+            data={[{ value: '', label: 'Any' }, ...states.map((state) => ({ value: state, label: state }))]}
+            value={filters.state || ''}
+            onChange={(val) => onChangeFilters({ ...filters, state: val || undefined })}
             radius="md"
             disabled={disabled}
           />
@@ -103,11 +115,52 @@ export default function FiltersBar({
           />
         </Grid.Col>
         <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>
+          <Select
+            label="Creator"
+            data={[{ value: '', label: 'Any' }, ...creators.map((c) => ({ value: c.id, label: c.name }))]}
+            value={filters.creatorId || ''}
+            onChange={(val) => onChangeFilters({ ...filters, creatorId: val || undefined })}
+            searchable
+            radius="md"
+            disabled={disabled}
+          />
+        </Grid.Col>
+        <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>
+          <Select
+            label="Cycle"
+            data={[
+              { value: '', label: 'Any' },
+              ...cycles.map((cycle) => ({
+                value: cycle.id,
+                label: cycle.name || `Cycle ${cycle.number}`,
+              })),
+            ]}
+            value={filters.cycleId || ''}
+            onChange={(val) =>
+              onChangeFilters({
+                ...filters,
+                cycleId: val || undefined,
+                time: val ? undefined : filters.time,
+                startDate: val ? undefined : filters.startDate,
+                endDate: val ? undefined : filters.endDate,
+              })
+            }
+            searchable
+            radius="md"
+            disabled={cycleDisabled}
+          />
+        </Grid.Col>
+        <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>
           <DateInput
             label="Start Date"
             value={filters.startDate ? new Date(filters.startDate) : null}
             onChange={(date) =>
-              onChangeFilters({ ...filters, startDate: date ? date.toISOString() : undefined })
+              onChangeFilters({
+                ...filters,
+                startDate: date ? date.toISOString() : undefined,
+                time: undefined,
+                cycleId: undefined,
+              })
             }
             clearable
             radius="md"
@@ -118,7 +171,14 @@ export default function FiltersBar({
           <DateInput
             label="End Date"
             value={filters.endDate ? new Date(filters.endDate) : null}
-            onChange={(date) => onChangeFilters({ ...filters, endDate: date ? date.toISOString() : undefined })}
+            onChange={(date) =>
+              onChangeFilters({
+                ...filters,
+                endDate: date ? date.toISOString() : undefined,
+                time: undefined,
+                cycleId: undefined,
+              })
+            }
             clearable
             radius="md"
             disabled={dateDisabled}

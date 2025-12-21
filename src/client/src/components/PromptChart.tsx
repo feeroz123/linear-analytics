@@ -29,6 +29,8 @@ type Props = {
 
 export default function PromptChart({ loading, onGenerate, result, disabled, usingCache }: Props) {
   const [prompt, setPrompt] = React.useState('Show bugs by assignee last 30 days');
+  const total = result ? computeChartTotal(result.spec, result.data) : null;
+  const totalLabel = total !== null ? `· ${total.toLocaleString()}` : '';
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -42,7 +44,7 @@ export default function PromptChart({ loading, onGenerate, result, disabled, usi
       <form onSubmit={handleSubmit}>
         <Stack>
           <Group justify="space-between">
-            <Text fw={700}>Prompt → Chart</Text>
+            <Text fw={700}>Prompt → Chart {totalLabel}</Text>
           </Group>
           {usingCache && (
             <Text
@@ -76,6 +78,33 @@ export default function PromptChart({ loading, onGenerate, result, disabled, usi
       </form>
     </Card>
   );
+}
+
+function computeChartTotal(spec: any, data: any): number | null {
+  if (!data || !spec) return null;
+
+  if (spec.type === 'pie' || spec.type === 'donut') {
+    if (!Array.isArray(data)) return null;
+    return data.reduce((sum, row) => sum + (Number(row.value) || 0), 0);
+  }
+
+  if (spec.type === 'scatter') {
+    const rows = Array.isArray(data) ? data : Array.isArray(data.data) ? data.data : [];
+    return rows.reduce((sum, row) => sum + (Number(row.y) || 0), 0);
+  }
+
+  const rows = Array.isArray(data.data) ? data.data : Array.isArray(data) ? data : [];
+  if (!rows.length) return 0;
+
+  const groupedKeys = Array.isArray(data.grouped) && data.grouped.length ? data.grouped : null;
+  if (groupedKeys) {
+    return rows.reduce((sum, row) => {
+      const rowTotal = groupedKeys.reduce((rowSum: number, key: string) => rowSum + (Number(row[key]) || 0), 0);
+      return sum + rowTotal;
+    }, 0);
+  }
+
+  return rows.reduce((sum, row) => sum + (Number(row.value) || 0), 0);
 }
 
 function DynamicChart({ spec, data }: { spec: any; data: any }) {

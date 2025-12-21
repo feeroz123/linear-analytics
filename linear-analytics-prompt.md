@@ -5,7 +5,7 @@ You are an expert full-stack TypeScript developer. Build a complete, production-
 ## 📋 SPECIFICATIONS
 
 ### Tech Stack (Latest & Fast)
-Frontend: React 19 + Vite + TypeScript + Mantine UI (or shadcn/tailwind)Backend: Node.js 22 LTS + Fastify + TypeScriptDatabase: SQLite (better-sqlite3 or Prisma)Charts: RechartsAPIs: Linear GraphQL + OpenAI Chat CompletionsAuth: Environment variables only (LINEAR_API_KEY, OPENAI_API_KEY)Deployment: Single process (npm run dev), localhost:3000
+Frontend: React 18 + Vite + TypeScript + Mantine UI (or shadcn/tailwind)Backend: Node.js 22 LTS + Fastify + TypeScriptDatabase: SQLite (better-sqlite3 or Prisma)Charts: RechartsAPIs: Linear GraphQL + OpenAI Chat CompletionsAuth: Environment variables only (LINEAR_API_KEY, OPENAI_API_KEY)Deployment: Single process (npm run dev), localhost:3000
 
 
 ### Core Features (EXACTLY as specified)
@@ -13,10 +13,10 @@ Frontend: React 19 + Vite + TypeScript + Mantine UI (or shadcn/tailwind)Backend:
 1. **Linear Connection**
    - Read `LINEAR_API_KEY` from `.env`
    - Validate on startup (GraphQL `me` query)
-   - List user's **Projects** only (GraphQL `projects` query, filter accessible ones)
+   - List user's **Teams** only (GraphQL `teams` query)
 
 2. **UI Layout**
-┌─────────────────────────────────────────────────────────────┐│ Linear: ✅ OpenAI: ✅                                    │ ← Top status bar├─────────────────────────────────────────────────────────────┤│ Project: Engineering ▼  │ Time: 30d ▼ State: All ▼   │ ← Filters (left)│ Type: All ▼ Assignee: Any ▼ Refresh                   │├─────────────────────────────────────────────────────────────┤│ DEFAULT METRICS                                             ││ ┌─────┐ ┌─────┐ ┌──────────────┐ ┌─────────────────────┐    ││ │Thrpt│ │Open │ │Bugs/Assignee │ │Bugs: Sev/Priority  │    │ ← 4 cards/charts│ │  42 │ │60/40│ │              │ │                     │    ││ └─────┘ └─────┘ └──────────────┘ └─────────────────────┘    │├─────────────────────────────────────────────────────────────┤│ PROMPT → CHART                                              ││ Describe your chart: “Bugs by team per week”              │ ← Textarea + Generate│                          Generate Chart                   ││                                                            │ ← Dynamic chart renders here└─────────────────────────────────────────────────────────────┘
+┌─────────────────────────────────────────────────────────────┐│ Linear: ✅ OpenAI: ✅                                    │ ← Top status bar├─────────────────────────────────────────────────────────────┤│ Team: Engineering ▼  │ Time: 30d/Any ▼ State: All ▼  │ ← Filters (left)│ Type: All ▼ Assignee: Any ▼ Creator: Any ▼ Cycle: Any ││ Start/End Dates ▼ ▼  │ Refresh                           │├─────────────────────────────────────────────────────────────┤│ DEFAULT METRICS (Totals shown in titles)                    ││ ┌─────┐ ┌─────┐ ┌──────────────┐ ┌─────────────────────┐    ││ │Thrpt│ │Open │ │Bugs/Assignee │ │Bugs: Sev/Priority  │    │ ← 4 cards/charts│ │  42 │ │60/40│ │              │ │                     │    ││ └─────┘ └─────┘ └──────────────┘ └─────────────────────┘    │├─────────────────────────────────────────────────────────────┤│ PROMPT → CHART (Total shown in title)                       ││ Describe your chart: “Bugs by team per week”              │ ← Textarea + Generate│                          Generate Chart                   ││                                                            │ ← Dynamic chart renders here└─────────────────────────────────────────────────────────────┘
 
 
 3. **Default Metrics (Auto-update on filter change)**
@@ -28,35 +28,39 @@ Bugs: Severity/Priority | Stacked Bar | COUNT(type=“bug”) GROUP BY severity,
 
 
 4. **Filters (All required)**
-   - Time: Last 7/30/90 days (from `createdAt`/`updatedAt`)
-   - State: All/Open/Completed  
-   - Type: All/Bug/Feature/Chore (from labels or `issueType`)
+   - Time: Any or Last 7/30/90 days (from `createdAt`/`updatedAt`)
+   - Start Date + End Date (inclusive)
+   - Cycle: Any / [dropdown of cycles from issues]
+   - State: Any / [dropdown of Linear state.type values]  
+   - Type: All/Bug/Feature/Chore (from labels)
    - Assignee: Any / [dropdown of assignees from issues]
-   - Project: Dropdown of user's Linear Projects
+   - Creator: Any / [dropdown of creators from issues]
+   - Team: Dropdown of user's Linear Teams
+   - Exclusivity: Time, Start/End Date, and Cycle are mutually exclusive
 
 5. **Prompt → Chart (OpenAI powered)**
-POST /api/chart-from-promptInput: { projectId, filters, prompt: “bugs per sprint by priority” }Process:
-	1.	Send to OpenAI: “Available: createdAt, completedAt, state.type, labels, priority, assignee, team. Generate chart spec JSON”
-	2.	OpenAI returns: {type: “bar”, x: “week”, y: “count”, groupBy: “priority”, filter: “type=bug”}
+POST /api/chart-from-promptInput: { teamId, filters, prompt: “bugs per sprint by priority” }Process:
+	1.	Send to OpenAI: “Available: id, title, url, createdAt, completedAt, state.type, labels, priority, assignee, creator, team, cycle, estimate. Generate chart spec JSON”
+	2.	OpenAI returns: {type: “bar”, xAxis: “week”, yAxis: “count”, groupBy: “priority”, filter: “type=bug&state=started”}
 	3.	Execute Linear query per spec
 	4.	Return chart-ready data to frontend
 
 
 ### Backend Endpoints (Fastify routes)
 /api/health - Connection status
-/api/projects - GET user's Linear projects {id, name, team}
-/api/metrics - GET default 4 metrics data (projectId + all filters)
-/api/chart-from-prompt - POST {projectId, filters, prompt} → chart data
+/api/teams - GET user's Linear teams {id, name}
+/api/metrics - GET default 4 metrics data (teamId + all filters)
+/api/chart-from-prompt - POST {teamId, filters, prompt} → chart data
 
 ### Linear GraphQL Queries (Essential fields only)
-Projects
-query { projects { nodes { id name team { name } } } }
+Teams
+query { teams { nodes { id name } } }
 Issues (paginated)
-query Issues($projectId: String!, $first: Int!) {project(id: $projectId) {issues(first: $first) {nodes {id title createdAt updatedAt completedAtstate { id name type }assignee { id name }prioritylabels { name }team { name }estimate}pageInfo { hasNextPage endCursor }}}}
+query Issues($teamId: ID!, $first: Int!, $after: String) {issues(first: $first, after: $after, filter: { team: { id: { eq: $teamId } } }) {nodes {id title url createdAt updatedAt completedAt state { id name type }assignee { id name }creator { id name }priority labels { nodes { name } }team { name }estimate cycle { id number name }}pageInfo { hasNextPage endCursor }}}
 
 
 ### Database (SQLite - single file `data.db`)
-– Only for app state (projects cache, recent filters)CREATE TABLE app_state (id INTEGER PRIMARY KEY,last_project TEXT,filters JSON,updated_at DATETIME DEFAULT CURRENT_TIMESTAMP);
+– Only for app state (team cache, recent filters)CREATE TABLE app_state (id INTEGER PRIMARY KEY,last_project TEXT,filters JSON,updated_at DATETIME DEFAULT CURRENT_TIMESTAMP);
 
 
 ### Environment (.env)
@@ -73,8 +77,8 @@ linear-analytics/├── package.json├── tsconfig.json
 ## 🎯 SUCCESS CRITERIA
 ✅ `npm install && npm run dev` → http://localhost:3000 works instantly
 ✅ Linear connection shows ✅ (uses your real API key)  
-✅ Projects dropdown populates from your Linear account
-✅ Default metrics render with real data from selected project
+✅ Teams dropdown populates from your Linear account
+✅ Default metrics render with real data from selected team
 ✅ "Show bugs by assignee last 30 days" → working chart appears
 ✅ Filters update all charts instantly
 ✅ No API keys exposed to browser
@@ -91,9 +95,9 @@ Open http://localhost:3000
 
 
 ## OpenAI System Prompt Template (for /chart-from-prompt)
-You are a chart generator for Linear issues. Available fields: id, title, createdAt, completedAt, state{type}, assignee{name}, priority, labels{name}, team{name}, estimate.
+You are a chart generator for Linear issues. Available fields: id, title, url, createdAt, completedAt, state{type}, assignee{name}, creator{name}, priority, labels{name}, team{name}, cycle{id,number,name}, estimate.
 User wants: “{prompt}”
-Respond ONLY with valid JSON:{“type”: “bar|line|pie|donut|scatter”,“title”: “string”,“xAxis”: “week|priority|assignee|stateType|severity”,“yAxis”: “count|avgEstimate|sumEstimate”,“groupBy”: “priority|team|severity|null”,“filter”: “type=bug&state=open”  // optional}
+Respond ONLY with valid JSON:{“type”: “bar|line|pie|donut|scatter”,“title”: “string”,“xAxis”: “week|priority|assignee|creator|stateType|severity|cycle”,“yAxis”: “count|avgEstimate|sumEstimate”,“groupBy”: “priority|team|severity|creator|cycle|null”,“filter”: “type=bug&state=started&creator=ID&cycle=ID”  // optional}
 
 
 ## CODE GENERATION RULES
@@ -102,11 +106,9 @@ Respond ONLY with valid JSON:{“type”: “bar|line|pie|donut|scatter”,“ti
 - Full error handling (Linear 401, OpenAI rate limits, etc.)
 - Responsive Mantine/shadcn UI (mobile + desktop)
 - Real-time filter updates (use React Query/SWR)
-- Cache Linear responses 5min (avoid rate limits)
+- Cache Linear responses 60min (avoid rate limits)
 - Pagination for large projects (>100 issues)
 - Loading/skeleton states everywhere
 - Dark mode support
 
 BUILD THE COMPLETE APPLICATION NOW. Start with `package.json` and folder structure, then all TypeScript files.
-
-

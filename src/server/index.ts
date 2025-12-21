@@ -55,16 +55,20 @@ fastify.get('/api/teams', async (request, reply) => {
 
 function parseFilters(params: Record<string, string | undefined>): Filters {
   const time = params.time as Filters['time'];
-  const state = params.state as Filters['state'];
+  const state = params.state;
   const type = params.type as Filters['type'];
   const assigneeId = params.assigneeId || undefined;
+  const creatorId = params.creatorId || undefined;
+  const cycleId = params.cycleId || undefined;
   const startDate = params.startDate;
   const endDate = params.endDate;
   return {
     time: time === '7d' || time === '30d' || time === '90d' ? time : undefined,
-    state: state === 'open' || state === 'completed' || state === 'all' ? state : undefined,
+    state: state || undefined,
     type: type === 'bug' || type === 'feature' || type === 'chore' || type === 'all' ? type : undefined,
     assigneeId,
+    creatorId,
+    cycleId,
     startDate: startDate || undefined,
     endDate: endDate || undefined,
   };
@@ -86,7 +90,15 @@ fastify.get('/api/metrics', async (request, reply) => {
   const from = dates.length ? new Date(Math.min(...dates.map((d) => d.getTime()))).toISOString() : undefined;
   const to = dates.length ? new Date(Math.max(...dates.map((d) => d.getTime()))).toISOString() : undefined;
 
-  return { metrics, filters, assignees: metrics.assignees, cacheInfo: { count: issues.length, from, to } };
+  return {
+    metrics,
+    filters,
+    assignees: metrics.assignees,
+    creators: metrics.creators,
+    cycles: metrics.cycles,
+    states: metrics.states,
+    cacheInfo: { count: issues.length, from, to },
+  };
 });
 
 fastify.post('/api/chart-from-prompt', async (request, reply) => {
@@ -111,8 +123,10 @@ function applySpecFilter(filters: Filters, filterString?: string): Filters {
     const [key, val] = pair.split('=');
     if (!key || !val) return;
     if (key === 'type' && (val === 'bug' || val === 'feature' || val === 'chore')) extra.type = val;
-    if (key === 'state' && (val === 'open' || val === 'completed')) extra.state = val;
+    if (key === 'state') extra.state = val;
     if (key === 'assignee') extra.assigneeId = val;
+    if (key === 'creator') extra.creatorId = val;
+    if (key === 'cycle') extra.cycleId = val;
   });
   return extra;
 }
@@ -129,12 +143,16 @@ function bucketFromSpec(issue: any, axis: ChartSpec['xAxis']): string {
       return typeof issue.priority === 'number' ? `P${issue.priority}` : 'Unprioritized';
     case 'assignee':
       return issue.assignee?.name || 'Unassigned';
+    case 'creator':
+      return issue.creator?.name || 'Unknown';
     case 'stateType':
-      return issue.state?.type || (issue.completedAt ? 'completed' : 'open');
+      return issue.state?.type || 'unknown';
     case 'severity': {
       const label = (issue.labels || []).find((l: any) => String(l.name).toLowerCase().includes('sev'))?.name;
       return label || 'Unknown';
     }
+    case 'cycle':
+      return issue.cycle?.name || (issue.cycle?.number ? `Cycle ${issue.cycle.number}` : 'No cycle');
     default:
       return 'Other';
   }
@@ -150,6 +168,10 @@ function groupFromSpec(issue: any, group: NonNullable<Exclude<ChartSpec['groupBy
       const label = (issue.labels || []).find((l: any) => String(l.name).toLowerCase().includes('sev'))?.name;
       return label || 'Unknown';
     }
+    case 'creator':
+      return issue.creator?.name || 'Unknown';
+    case 'cycle':
+      return issue.cycle?.name || (issue.cycle?.number ? `Cycle ${issue.cycle.number}` : 'No cycle');
     default:
       return 'Other';
   }

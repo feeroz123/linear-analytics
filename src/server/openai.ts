@@ -1,15 +1,15 @@
 import OpenAI from 'openai';
 
-const systemPrompt = `You are a chart generator for Linear issues. Available fields: id, title, createdAt, completedAt, state{type}, assignee{name}, priority, labels{name}, team{name}, estimate.
+const systemPrompt = `You are a chart generator for Linear issues. Available fields: id, title, url, createdAt, completedAt, state{type}, assignee{name}, creator{name}, priority, labels{name}, team{name}, cycle{id,number,name}, estimate.
 User wants: "{prompt}"
-Respond ONLY with valid JSON:{"type": "bar|line|pie|donut|scatter","title": "string","xAxis": "week|priority|assignee|stateType|severity","yAxis": "count|avgEstimate|sumEstimate","groupBy": "priority|team|severity|null","filter": "type=bug&state=open"  // optional}`;
+Respond ONLY with valid JSON:{"type": "bar|line|pie|donut|scatter","title": "string","xAxis": "week|priority|assignee|creator|stateType|severity|cycle","yAxis": "count|avgEstimate|sumEstimate","groupBy": "priority|team|severity|creator|cycle|null","filter": "type=bug&state=started&creator=ID&cycle=ID"  // optional}`;
 
 export type ChartSpec = {
   type: 'bar' | 'line' | 'pie' | 'donut' | 'scatter';
   title: string;
-  xAxis: 'week' | 'priority' | 'assignee' | 'stateType' | 'severity';
+  xAxis: 'week' | 'priority' | 'assignee' | 'creator' | 'stateType' | 'severity' | 'cycle';
   yAxis: 'count' | 'avgEstimate' | 'sumEstimate';
-  groupBy: 'priority' | 'team' | 'severity' | 'null' | null;
+  groupBy: 'priority' | 'team' | 'severity' | 'creator' | 'cycle' | 'null' | null;
   filter?: string;
 };
 

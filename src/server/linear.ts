@@ -9,19 +9,22 @@ type LinearLabel = { name: string };
 export type LinearIssue = {
   id: string;
   title: string;
+  url: string;
   createdAt: string;
   updatedAt: string;
   completedAt?: string | null;
   state: LinearState | null;
   assignee: { id: string; name: string } | null;
+  creator?: { id: string; name: string } | null;
   priority?: number | null;
   labels?: LinearLabel[] | null;
   team?: { name: string } | null;
   estimate?: number | null;
+  cycle?: { id: string; number: number; name: string } | null;
 };
 
 const LINEAR_URL = 'https://api.linear.app/graphql';
-const CACHE_TTL_MS = 30 * 60 * 1000;
+const CACHE_TTL_MS = 60 * 60 * 1000; // 60 minutes
 
 export class LinearClient {
   private token: string;
@@ -108,7 +111,13 @@ export class LinearClient {
   async getIssues(teamId: string, first = 100, preferCache = false): Promise<LinearIssue[]> {
     const cacheKey = `issues:${teamId}`;
     const cached = this.getCache<LinearIssue[]>(cacheKey);
-    if (cached || preferCache) return cached ?? [];
+    const cachedIssues = cached ?? [];
+    const hasUrlField = cachedIssues.length ? typeof cachedIssues[0].url === 'string' : true;
+    if (cachedIssues.length && !hasUrlField) {
+      this.cache.delete(cacheKey);
+    }
+    const freshCached = this.getCache<LinearIssue[]>(cacheKey);
+    if (freshCached || preferCache) return freshCached ?? [];
 
     let issues: LinearIssue[] = [];
     let hasNextPage = true;
@@ -119,15 +128,18 @@ export class LinearClient {
         nodes {
           id
           title
+          url
           createdAt
           updatedAt
           completedAt
           state { id name type }
           assignee { id name }
+          creator { id name }
           priority
           labels { nodes { name } }
           team { name }
           estimate
+          cycle { id number name }
         }
         pageInfo { hasNextPage endCursor }
       }

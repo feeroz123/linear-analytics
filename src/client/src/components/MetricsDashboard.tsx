@@ -73,6 +73,11 @@ export default function MetricsDashboard({ metrics, loading }: Props) {
 
   const openModal = (title: string, content: React.ReactNode) => setModal({ open: true, title, content });
   const closeModal = () => setModal({ open: false, title: '', content: null });
+  const formatTotal = (value: number) => value.toLocaleString();
+  const throughputTotal = metrics ? metrics.throughput.reduce((sum, row) => sum + row.count, 0) : 0;
+  const openClosedTotal = metrics ? metrics.openVsClosed.reduce((sum, row) => sum + row.value, 0) : 0;
+  const bugsAssigneeTotal = metrics ? metrics.bugsByAssignee.reduce((sum, row) => sum + row.count, 0) : 0;
+  const bugsSeverityTotal = metrics ? metrics.bugsBySeverityPriority.reduce((sum, row) => sum + row.count, 0) : 0;
 
   return (
     <Stack mb="md">
@@ -81,7 +86,7 @@ export default function MetricsDashboard({ metrics, loading }: Props) {
       </Text>
       <Stack gap="md">
         <ChartCard
-          title="Throughput (weekly)"
+          title={`Throughput (weekly) ${metrics ? `· ${formatTotal(throughputTotal)}` : ''}`}
           tooltip="Completed issues grouped by week based on completedAt."
           loading={loading}
           onExpand={
@@ -96,8 +101,8 @@ export default function MetricsDashboard({ metrics, loading }: Props) {
         <Grid gutter="md">
           <Grid.Col span={{ base: 12, md: 4 }}>
             <ChartCard
-              title="Open vs Closed"
-              tooltip="Distribution of open vs completed issues."
+              title={`Issues by State ${metrics ? `· ${formatTotal(openClosedTotal)}` : ''}`}
+              tooltip="Distribution of issues by Linear state type."
               loading={loading}
               onExpand={
                 metrics && metrics.openVsClosed.length
@@ -115,7 +120,7 @@ export default function MetricsDashboard({ metrics, loading }: Props) {
 
           <Grid.Col span={{ base: 12, md: 4 }}>
             <ChartCard
-              title="Bugs / Assignee"
+              title={`Bugs / Assignee ${metrics ? `· ${formatTotal(bugsAssigneeTotal)}` : ''}`}
               tooltip="Count of bug-type issues per assignee."
               loading={loading}
               onExpand={
@@ -130,7 +135,7 @@ export default function MetricsDashboard({ metrics, loading }: Props) {
 
           <Grid.Col span={{ base: 12, md: 4 }}>
             <ChartCard
-              title="Bugs: Severity / Priority"
+              title={`Bugs: Severity / Priority ${metrics ? `· ${formatTotal(bugsSeverityTotal)}` : ''}`}
               tooltip="Bug counts grouped by severity label and priority."
               loading={loading}
               onExpand={

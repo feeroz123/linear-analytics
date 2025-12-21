@@ -1,8 +1,10 @@
 export type Filters = {
   time?: '7d' | '30d' | '90d';
-  state?: 'all' | 'open' | 'completed';
+  state?: string;
   type?: 'all' | 'bug' | 'feature' | 'chore';
   assigneeId?: string;
+  creatorId?: string;
+  cycleId?: string;
   startDate?: string;
   endDate?: string;
 };
@@ -16,9 +18,15 @@ export type MetricsResponse = {
     bugsByAssignee: { name: string; count: number }[];
     bugsBySeverityPriority: { severity: string; priority: string; count: number }[];
     assignees: { id: string; name: string }[];
+    creators: { id: string; name: string }[];
+    cycles: { id: string; name: string; number: number }[];
+    states: string[];
   };
   filters: Filters;
   assignees: { id: string; name: string }[];
+  creators: { id: string; name: string }[];
+  cycles: { id: string; name: string; number: number }[];
+  states: string[];
   cacheInfo?: { count: number; from?: string; to?: string };
 };
 
