@@ -1,15 +1,22 @@
 import React from 'react';
-import { Card, Grid, Select, Button, Group, Text, MultiSelect } from '@mantine/core';
+import { Card, Grid, Select, Button, Group, Text, MultiSelect, Menu, Tooltip, ActionIcon, Collapse } from '@mantine/core';
+import { IconTrash, IconEdit, IconChevronDown, IconChevronUp } from '@tabler/icons-react';
 import { DateInput } from '@mantine/dates';
-import { IconRefresh } from '@tabler/icons-react';
+import { IconDownload, IconRefresh } from '@tabler/icons-react';
 import { Filters, Team } from '../api.js';
 
 type Props = {
   teams: Team[];
+  savedPresets: { id: string; name: string }[];
   filters: Filters;
   onChangeFilters: (f: Filters) => void;
   teamId: string | null;
   onSelectTeam: (id: string) => void;
+  onSelectPreset: (id: string) => void;
+  onSavePreset: () => void;
+  onEditPreset: (id: string) => void;
+  onDeletePreset: (id: string) => void;
+  selectedPresetId?: string | null;
   assignees: { id: string; name: string }[];
   creators: { id: string; name: string }[];
   cycles: { id: string; name: string; number: number }[];
@@ -19,6 +26,8 @@ type Props = {
   labels: string[];
   projects: { id: string; name: string }[];
   onRefresh: () => void;
+  onExportCsv: () => void;
+  onExportPdf: () => void;
   onClearFilters: () => void;
   loading?: boolean;
   disabled?: boolean;
@@ -27,10 +36,16 @@ type Props = {
 
 export default function FiltersBar({
   teams,
+  savedPresets,
   filters,
   onChangeFilters,
   teamId,
   onSelectTeam,
+  onSelectPreset,
+  onSavePreset,
+  onEditPreset,
+  onDeletePreset,
+  selectedPresetId,
   assignees,
   creators,
   cycles,
@@ -40,15 +55,30 @@ export default function FiltersBar({
   labels,
   projects,
   onRefresh,
+  onExportCsv,
+  onExportPdf,
   onClearFilters,
   loading,
   disabled,
   loadingMessage,
 }: Props) {
+  const [opened, setOpened] = React.useState(() => {
+    const stored = localStorage.getItem('linear-filters-open');
+    return stored ? stored === 'true' : false;
+  });
   const timeDisabled = disabled || Boolean(filters.startDate || filters.endDate) || Boolean(filters.cycleId);
   const dateDisabled = disabled || Boolean(filters.time) || Boolean(filters.cycleId);
   const cycleDisabled = disabled || Boolean(filters.time || filters.startDate || filters.endDate);
   const prevDateDisabled = React.useRef(dateDisabled);
+  const appliedBorder = (active: boolean) =>
+    active
+      ? {
+          input: {
+            borderColor: '#228be6',
+            boxShadow: '0 0 0 1px #228be6',
+          },
+        }
+      : undefined;
 
   React.useEffect(() => {
     if (prevDateDisabled.current && !dateDisabled && !filters.endDate) {
@@ -59,7 +89,28 @@ export default function FiltersBar({
 
   return (
     <Card withBorder shadow="sm" mb="md" radius="md">
-      <Grid gutter="sm" align="end">
+      <Group justify="space-between" align="center" mb="xs">
+        <Text fw={700} size="sm">
+          Filters
+        </Text>
+        <Tooltip label={opened ? 'Collapse filters' : 'Expand filters'} withArrow>
+          <ActionIcon
+            variant="subtle"
+            onClick={() => {
+              setOpened((prev) => {
+                const next = !prev;
+                localStorage.setItem('linear-filters-open', String(next));
+                return next;
+              });
+            }}
+            aria-label="Toggle filters"
+          >
+            {opened ? <IconChevronUp size={18} /> : <IconChevronDown size={18} />}
+          </ActionIcon>
+        </Tooltip>
+      </Group>
+      <Collapse in={opened}>
+        <Grid gutter="sm" align="end">
         <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
           <Select
             label="Team"
@@ -70,6 +121,7 @@ export default function FiltersBar({
             searchable
             radius="md"
             disabled={disabled}
+            styles={appliedBorder(Boolean(teamId))}
           />
         </Grid.Col>
         <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
@@ -81,7 +133,43 @@ export default function FiltersBar({
             searchable
             radius="md"
             disabled={disabled}
+            styles={appliedBorder(Boolean(filters.projectId))}
           />
+        </Grid.Col>
+        <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
+          <Group gap="xs" align="end">
+            <Select
+              label="Saved Filters"
+              data={savedPresets.map((preset) => ({ value: preset.id, label: preset.name }))}
+              placeholder="Select saved filters"
+              value={selectedPresetId || ''}
+              onChange={(val) => val && onSelectPreset(val)}
+              searchable
+              radius="md"
+              disabled={disabled || savedPresets.length === 0}
+              styles={{ root: { flex: 1 } }}
+            />
+            <Tooltip label="Rename saved filters" withArrow>
+              <ActionIcon
+                variant="light"
+                aria-label="Rename saved filters"
+                onClick={() => selectedPresetId && onEditPreset(selectedPresetId)}
+                disabled={disabled || !selectedPresetId}
+              >
+                <IconEdit size={16} />
+              </ActionIcon>
+            </Tooltip>
+            <Tooltip label="Delete saved filters" withArrow>
+              <ActionIcon
+                variant="light"
+                aria-label="Delete saved filters"
+                onClick={() => selectedPresetId && onDeletePreset(selectedPresetId)}
+                disabled={disabled || !selectedPresetId}
+              >
+                <IconTrash size={16} />
+              </ActionIcon>
+            </Tooltip>
+          </Group>
         </Grid.Col>
         <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>
           <Select
@@ -104,6 +192,7 @@ export default function FiltersBar({
             }
             radius="md"
             disabled={timeDisabled}
+            styles={appliedBorder(Boolean(filters.time))}
           />
         </Grid.Col>
         <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>
@@ -114,6 +203,7 @@ export default function FiltersBar({
             onChange={(val) => onChangeFilters({ ...filters, state: val || undefined })}
             radius="md"
             disabled={disabled}
+            styles={appliedBorder(Boolean(filters.state))}
           />
         </Grid.Col>
         <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>
@@ -129,6 +219,7 @@ export default function FiltersBar({
             onChange={(val) => onChangeFilters({ ...filters, type: val as Filters['type'] })}
             radius="md"
             disabled={disabled}
+            styles={appliedBorder(Boolean(filters.type && filters.type !== 'all'))}
           />
         </Grid.Col>
         <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>
@@ -140,6 +231,7 @@ export default function FiltersBar({
             searchable
             radius="md"
             disabled={disabled}
+            styles={appliedBorder(Boolean(filters.severity))}
           />
         </Grid.Col>
         <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>
@@ -151,6 +243,7 @@ export default function FiltersBar({
             searchable
             radius="md"
             disabled={disabled}
+            styles={appliedBorder(Boolean(filters.priority))}
           />
         </Grid.Col>
         <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
@@ -164,6 +257,7 @@ export default function FiltersBar({
             radius="md"
             disabled={disabled}
             placeholder="Select labels"
+            styles={appliedBorder(Boolean(filters.labels && filters.labels.length))}
           />
         </Grid.Col>
         <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>
@@ -175,6 +269,7 @@ export default function FiltersBar({
             searchable
             radius="md"
             disabled={disabled}
+            styles={appliedBorder(Boolean(filters.assigneeId))}
           />
         </Grid.Col>
         <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>
@@ -186,6 +281,7 @@ export default function FiltersBar({
             searchable
             radius="md"
             disabled={disabled}
+            styles={appliedBorder(Boolean(filters.creatorId))}
           />
         </Grid.Col>
         <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>
@@ -211,6 +307,7 @@ export default function FiltersBar({
             searchable
             radius="md"
             disabled={cycleDisabled}
+            styles={appliedBorder(Boolean(filters.cycleId))}
           />
         </Grid.Col>
         <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>
@@ -228,6 +325,7 @@ export default function FiltersBar({
             clearable
             radius="md"
             disabled={dateDisabled}
+            styles={appliedBorder(Boolean(filters.startDate))}
           />
         </Grid.Col>
         <Grid.Col span={{ base: 6, sm: 4, md: 2 }}>
@@ -245,30 +343,62 @@ export default function FiltersBar({
             clearable
             radius="md"
             disabled={dateDisabled}
+            styles={appliedBorder(Boolean(filters.endDate))}
           />
         </Grid.Col>
-        <Grid.Col span={{ base: 12, sm: 8, md: 4 }}>
-          <Group align="end" justify="flex-end" h="100%" gap="xs">
-            <Button
-              variant="subtle"
-              onClick={onClearFilters}
-              radius="md"
-              size="sm"
-              disabled={disabled}
-            >
-              Clear Filters
-            </Button>
-            <Button
-              leftSection={<IconRefresh size={16} />}
-              variant="light"
-              onClick={onRefresh}
-              loading={loading}
-              radius="md"
-              size="sm"
-              disabled={disabled}
-            >
-              Refresh
-            </Button>
+        <Grid.Col span={12}>
+          <Group align="end" justify="flex-end" h="100%" gap="xs" wrap="nowrap">
+            <Tooltip label="Clear all filters" withArrow>
+              <Button
+                variant="filled"
+                onClick={onClearFilters}
+                radius="md"
+                size="sm"
+                color="blue"
+                disabled={disabled}
+              >
+                Clear Filters
+              </Button>
+            </Tooltip>
+            <Tooltip label="Save current filters" withArrow>
+              <Button variant="filled" onClick={onSavePreset} radius="md" size="sm" color="blue" disabled={disabled}>
+                Save Filters
+              </Button>
+            </Tooltip>
+            <Tooltip label="Refresh data" withArrow>
+              <Button
+                leftSection={<IconRefresh size={16} />}
+                variant="filled"
+                onClick={onRefresh}
+                loading={loading}
+                radius="md"
+                size="sm"
+                color="blue"
+                disabled={disabled}
+              >
+                Refresh
+              </Button>
+            </Tooltip>
+            <Menu shadow="md" width={180} position="bottom-end">
+              <Menu.Target>
+                <Tooltip label="Export data" withArrow>
+                  <Button
+                    leftSection={<IconDownload size={16} />}
+                    variant="filled"
+                    radius="md"
+                    size="sm"
+                    color="blue"
+                    disabled={disabled}
+                  >
+                    Export
+                  </Button>
+                </Tooltip>
+              </Menu.Target>
+              <Menu.Dropdown>
+                <Menu.Item onClick={onExportCsv}>CSV</Menu.Item>
+                <Menu.Item onClick={onExportPdf}>PDF</Menu.Item>
+              </Menu.Dropdown>
+            </Menu>
           </Group>
         </Grid.Col>
         {loadingMessage && (
@@ -281,7 +411,8 @@ export default function FiltersBar({
             </Text>
           </Grid.Col>
         )}
-      </Grid>
+        </Grid>
+      </Collapse>
     </Card>
   );
 }

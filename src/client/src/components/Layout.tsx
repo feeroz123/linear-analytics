@@ -5,11 +5,11 @@ import {
   Badge,
   ActionIcon,
   useMantineTheme,
-  useMantineColorScheme,
   useComputedColorScheme,
   Paper,
+  Tooltip,
 } from '@mantine/core';
-import { IconSun, IconMoon } from '@tabler/icons-react';
+import { IconSun, IconMoon, IconRefresh } from '@tabler/icons-react';
 import React from 'react';
 
 const StatusBadge = ({ label, ok }: { label: string; ok: boolean }) => (
@@ -24,15 +24,17 @@ type Props = {
   openaiOk: boolean;
   lastRefreshed?: Date | null;
   cacheInfo?: { count: number; from?: string; to?: string };
+  onToggleTheme: () => void;
+  onReloadKeys: () => void;
 };
 
-export default function Layout({ children, linearOk, openaiOk, lastRefreshed, cacheInfo }: Props) {
+export default function Layout({ children, linearOk, openaiOk, lastRefreshed, cacheInfo, onToggleTheme, onReloadKeys }: Props) {
   const theme = useMantineTheme();
-  const { toggleColorScheme } = useMantineColorScheme();
   const colorScheme = useComputedColorScheme('light', { getInitialValueInEffect: true });
   const refreshedLabel = lastRefreshed
     ? `Last Refreshed: ${lastRefreshed.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`
     : 'Last Refreshed: --:--';
+  const isStale = lastRefreshed ? Date.now() - lastRefreshed.getTime() > 60 * 60 * 1000 : false;
 
   return (
     <AppShell
@@ -59,10 +61,16 @@ export default function Layout({ children, linearOk, openaiOk, lastRefreshed, ca
           }}
         >
           <Group>
+            <img src="/favicon.svg" alt="Linear Analytics logo" width={20} height={20} />
             <Text fw={700}>Linear Analytics</Text>
             <StatusBadge label="Linear" ok={linearOk} />
             <StatusBadge label="OpenAI" ok={openaiOk} />
-            <Text size="sm" c="dimmed">
+            <Tooltip label="Reload API keys" withArrow>
+              <ActionIcon variant="subtle" onClick={onReloadKeys} aria-label="Reload API keys">
+                <IconRefresh size={18} />
+              </ActionIcon>
+            </Tooltip>
+            <Text size="sm" c="dimmed" fw={isStale ? 700 : 400}>
               {refreshedLabel}
             </Text>
             {cacheInfo && (
@@ -71,9 +79,11 @@ export default function Layout({ children, linearOk, openaiOk, lastRefreshed, ca
               </Text>
             )}
           </Group>
-          <ActionIcon variant="subtle" onClick={() => toggleColorScheme()} aria-label="Toggle theme">
-            {colorScheme === 'light' ? <IconMoon size={18} /> : <IconSun size={18} />}
-          </ActionIcon>
+          <Tooltip label="Toggle theme" withArrow>
+            <ActionIcon variant="subtle" onClick={onToggleTheme} aria-label="Toggle theme">
+              {colorScheme === 'light' ? <IconMoon size={18} /> : <IconSun size={18} />}
+            </ActionIcon>
+          </Tooltip>
         </Paper>
       </AppShell.Header>
       <AppShell.Main>{children}</AppShell.Main>

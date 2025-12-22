@@ -1,5 +1,6 @@
 import React from 'react';
-import { Card, Textarea, Button, Stack, Text, Group } from '@mantine/core';
+import { Card, Textarea, Button, Stack, Text, Group, ActionIcon, Tooltip as MantineTooltip } from '@mantine/core';
+import { IconDownload } from '@tabler/icons-react';
 import {
   ResponsiveContainer,
   BarChart,
@@ -27,9 +28,20 @@ type Props = {
   disabled?: boolean;
   usingCache?: boolean;
   onChartClick?: (payload: { bucket: string; series?: string; spec: any; title: string }) => void;
+  onChartExport?: (payload: { spec: any; title: string }) => void;
+  openaiHealthy?: boolean;
 };
 
-export default function PromptChart({ loading, onGenerate, result, disabled, usingCache, onChartClick }: Props) {
+export default function PromptChart({
+  loading,
+  onGenerate,
+  result,
+  disabled,
+  usingCache,
+  onChartClick,
+  onChartExport,
+  openaiHealthy = true,
+}: Props) {
   const [prompt, setPrompt] = React.useState('Show bugs by assignee last 30 days');
   const total = result ? computeChartTotal(result.spec, result.data) : null;
   const totalLabel = total !== null ? `· ${total.toLocaleString()}` : '';
@@ -47,6 +59,23 @@ export default function PromptChart({ loading, onGenerate, result, disabled, usi
         <Stack>
           <Group justify="space-between">
             <Text fw={700}>Prompt → Chart {totalLabel}</Text>
+            <MantineTooltip label="Export chart" withArrow>
+              <ActionIcon
+                variant="subtle"
+                size="sm"
+                aria-label="Export chart"
+                onClick={() =>
+                  result &&
+                  onChartExport?.({
+                    spec: result.spec,
+                    title: result.spec?.title || 'Prompt Chart',
+                  })
+                }
+                disabled={!result}
+              >
+                <IconDownload size={16} />
+              </ActionIcon>
+            </MantineTooltip>
           </Group>
           {usingCache && (
             <Text
@@ -56,15 +85,22 @@ export default function PromptChart({ loading, onGenerate, result, disabled, usi
               Chart is based on cached issues. Click Refresh to fetch the latest data before generating.
             </Text>
           )}
+          {!openaiHealthy && (
+            <Text size="sm" c="red">
+              OpenAI API key is missing or invalid. Prompt chart is disabled.
+            </Text>
+          )}
           <Textarea
             label="Describe your chart"
             value={prompt}
             onChange={(e) => setPrompt(e.currentTarget.value)}
             minRows={2}
           />
-          <Button type="submit" loading={loading} disabled={disabled} size="sm" radius="md" w="fit-content">
-            Generate Chart
-          </Button>
+          <MantineTooltip label="Generate chart from prompt" withArrow>
+            <Button type="submit" loading={loading} disabled={disabled} size="sm" radius="md" w="fit-content" color="blue">
+              Generate Chart
+            </Button>
+          </MantineTooltip>
           {empty ? (
             <Text
               c="dimmed"

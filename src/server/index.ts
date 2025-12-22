@@ -9,7 +9,7 @@ import { createServer as createViteServer } from 'vite';
 
 import { LinearClient } from './linear.js';
 import { buildMetrics, filterIssues, Filters, inferIssueType, priorityLabel, severityLabel, weekLabel } from './metrics.js';
-import { getAppState, saveAppState } from './db.js';
+import { createSavedFilter, deleteSavedFilter, getAppState, listSavedFilters, saveAppState, saveTheme, updateSavedFilter } from './db.js';
 import { generateChartSpec, ChartSpec } from './openai.js';
 import { registerNoCacheHook } from './hooks.js';
 
@@ -17,8 +17,24 @@ loadEnv();
 
 const isProd = process.env.NODE_ENV === 'production';
 const PORT = Number(process.env.PORT || 3000);
-const linearKey = process.env.LINEAR_API_KEY || '';
-const openaiKey = process.env.OPENAI_API_KEY || '';
+let linearKey = process.env.LINEAR_API_KEY || '';
+let openaiKey = process.env.OPENAI_API_KEY || '';
+
+function getCreatedAtRange(filters: Filters | undefined) {
+  if (!filters) return { createdAfter: undefined, createdBefore: undefined };
+  if (filters.startDate || filters.endDate) {
+    return {
+      createdAfter: filters.startDate,
+      createdBefore: filters.endDate,
+    };
+  }
+  if (filters.time) {
+    const days = filters.time === '7d' ? 7 : filters.time === '30d' ? 30 : 90;
+    const createdAfter = new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString();
+    return { createdAfter, createdBefore: undefined };
+  }
+  return { createdAfter: undefined, createdBefore: undefined };
+}
 
 // Disable etag/304s to keep responses always fresh for the SPA/API
 const fastify = Fastify({ logger: true, etag: false });
@@ -27,7 +43,7 @@ await fastify.register(cors, { origin: true, credentials: true });
 await fastify.register(middie);
 await registerNoCacheHook(fastify);
 
-const linearClient = linearKey ? new LinearClient(linearKey) : null;
+let linearClient = linearKey ? new LinearClient(linearKey) : null;
 const status = {
   linear: false,
   openai: Boolean(openaiKey),
@@ -43,6 +59,55 @@ fastify.get('/api/health', async () => {
   const linearOk = linearClient ? await linearClient.validate() : false;
   status.linear = linearOk;
   return { linear: linearOk, openai: status.openai };
+});
+
+fastify.post('/api/reload-keys', async () => {
+  loadEnv({ override: true });
+  linearKey = process.env.LINEAR_API_KEY || '';
+  openaiKey = process.env.OPENAI_API_KEY || '';
+  linearClient = linearKey ? new LinearClient(linearKey) : null;
+  status.openai = Boolean(openaiKey);
+  status.linear = linearClient ? await linearClient.validate() : false;
+  return { linear: status.linear, openai: status.openai };
+});
+
+fastify.get('/api/theme', async () => {
+  const state = getAppState();
+  return { theme: state.theme };
+});
+
+fastify.post('/api/theme', async (request, reply) => {
+  const body = request.body as { theme?: string | null };
+  if (!body.theme) return reply.badRequest('theme is required');
+  saveTheme(body.theme);
+  return { theme: body.theme };
+});
+
+fastify.get('/api/filter-presets', async () => {
+  return { presets: listSavedFilters() };
+});
+
+fastify.post('/api/filter-presets', async (request, reply) => {
+  const body = request.body as { name?: string; teamId?: string | null; filters?: Filters };
+  if (!body.name || !body.filters) return reply.badRequest('name and filters are required');
+  const id = `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  createSavedFilter({ id, name: body.name, teamId: body.teamId ?? null, filters: body.filters });
+  return { id };
+});
+
+fastify.put('/api/filter-presets/:id', async (request, reply) => {
+  const body = request.body as { name?: string; teamId?: string | null; filters?: Filters };
+  const id = (request.params as { id?: string }).id;
+  if (!id || !body.name || !body.filters) return reply.badRequest('id, name, and filters are required');
+  updateSavedFilter({ id, name: body.name, teamId: body.teamId ?? null, filters: body.filters });
+  return { id };
+});
+
+fastify.delete('/api/filter-presets/:id', async (request, reply) => {
+  const id = (request.params as { id?: string }).id;
+  if (!id) return reply.badRequest('id is required');
+  deleteSavedFilter(id);
+  return { id };
 });
 
 fastify.get('/api/teams', async (request, reply) => {
@@ -89,8 +154,9 @@ fastify.get('/api/metrics', async (request, reply) => {
   if (!teamId) return reply.badRequest('teamId is required');
 
   const filters = parseFilters(query);
-  const cachedIssues = await linearClient.getIssues(teamId, 100, true);
-  const issues = cachedIssues.length ? cachedIssues : await linearClient.getIssues(teamId);
+  const range = getCreatedAtRange(filters);
+  const cachedIssues = await linearClient.getIssues(teamId, { first: 100, preferCache: true, ...range });
+  const issues = cachedIssues.length ? cachedIssues : await linearClient.getIssues(teamId, { ...range });
   const metrics = buildMetrics(issues, filters);
   saveAppState(teamId, filters);
 
@@ -119,13 +185,147 @@ fastify.post('/api/chart-from-prompt', async (request, reply) => {
   if (!openaiKey) return reply.badRequest('Missing OPENAI_API_KEY');
   if (!body.teamId || !body.prompt) return reply.badRequest('teamId and prompt are required');
 
-  const cachedIssues = await linearClient.getIssues(body.teamId, 100, true);
-  const issues = cachedIssues.length ? cachedIssues : await linearClient.getIssues(body.teamId);
+  const range = getCreatedAtRange(body.filters);
+  const cachedIssues = await linearClient.getIssues(body.teamId, { first: 100, preferCache: true, ...range });
+  const issues = cachedIssues.length ? cachedIssues : await linearClient.getIssues(body.teamId, { ...range });
   const baseFilters = body.filters ?? {};
   const spec = await generateChartSpec(openaiKey, body.prompt);
   const data = buildChartFromSpec(issues, baseFilters, spec);
 
   return { spec, data };
+});
+
+function filterIssuesForChart(payload: {
+  issues: any[];
+  baseFilters: Filters;
+  chart: 'throughput' | 'bugsByState' | 'bugsByAssignee' | 'bugsByPriority' | 'bugsBySeverity' | 'prompt';
+  bucket?: string;
+  series?: string;
+  spec?: ChartSpec;
+}) {
+  const scoped = filterIssues(payload.issues, payload.baseFilters);
+  switch (payload.chart) {
+    case 'throughput': {
+      const completed = scoped.filter((issue) => issue.completedAt);
+      if (!payload.bucket) return completed;
+      return completed.filter((issue) => weekLabel(new Date(issue.completedAt)) === payload.bucket);
+    }
+    case 'bugsByState': {
+      const bugs = scoped.filter((issue) => inferIssueType(issue) === 'bug');
+      if (!payload.bucket) return bugs;
+      return bugs.filter((issue) => (issue.state?.type || 'unknown') === payload.bucket);
+    }
+    case 'bugsByAssignee': {
+      const bugs = scoped.filter((issue) => inferIssueType(issue) === 'bug');
+      if (!payload.bucket) return bugs;
+      return bugs.filter((issue) => (issue.assignee?.name || 'Unassigned') === payload.bucket);
+    }
+    case 'bugsByPriority': {
+      const bugs = scoped.filter((issue) => inferIssueType(issue) === 'bug');
+      if (!payload.bucket) return bugs;
+      return bugs.filter((issue) => priorityLabel(issue) === payload.bucket);
+    }
+    case 'bugsBySeverity': {
+      const bugs = scoped.filter((issue) => inferIssueType(issue) === 'bug');
+      if (!payload.bucket) return bugs;
+      return bugs.filter((issue) => severityLabel(issue) === payload.bucket);
+    }
+    case 'prompt': {
+      const spec = payload.spec;
+      if (!spec) return [];
+      const mergedFilters = applySpecFilter(payload.baseFilters, spec.filter);
+      const promptScoped = filterIssues(payload.issues, mergedFilters);
+      const grouped = spec.groupBy && spec.groupBy !== 'null';
+      if (!payload.bucket) return promptScoped;
+      return promptScoped.filter((issue) => {
+        const bucket = bucketFromSpec(issue, spec.xAxis);
+        if (bucket !== payload.bucket) return false;
+        if (!grouped) return true;
+        const groupKey = groupFromSpec(issue, spec.groupBy as any);
+        return groupKey === payload.series;
+      });
+    }
+    default:
+      return scoped;
+  }
+}
+
+function issuesToCsv(issues: any[]) {
+  const headers = [
+    'Issue ID',
+    'Issue Title',
+    'URL',
+    'Created At',
+    'Updated At',
+    'Completed At',
+    'State ID',
+    'State Name',
+    'State Type',
+    'Type',
+    'Creator ID',
+    'Creator Name',
+    'Assignee ID',
+    'Assignee Name',
+    'Priority',
+    'Severity',
+    'Labels',
+    'Team',
+    'Project ID',
+    'Project Name',
+    'Estimate',
+    'Cycle ID',
+    'Cycle Number',
+    'Cycle Name',
+  ];
+  const escapeCsv = (value: string) => `"${value.replace(/\"/g, '""')}"`;
+  const rows = issues.map((issue) => {
+    const labels = (issue.labels ?? []).map((label: any) => label.name).join('; ');
+    return [
+      issue.identifier || issue.id,
+      issue.title,
+      issue.url,
+      issue.createdAt,
+      issue.updatedAt,
+      issue.completedAt ?? '',
+      issue.state?.id ?? '',
+      issue.state?.name ?? '',
+      issue.state?.type ?? '',
+      inferIssueType(issue),
+      issue.creator?.id ?? '',
+      issue.creator?.name ?? '',
+      issue.assignee?.id ?? '',
+      issue.assignee?.name ?? '',
+      priorityLabel(issue),
+      severityLabel(issue),
+      labels,
+      issue.team?.name ?? '',
+      issue.project?.id ?? '',
+      issue.project?.name ?? '',
+      issue.estimate?.toString() ?? '',
+      issue.cycle?.id ?? '',
+      issue.cycle?.number?.toString() ?? '',
+      issue.cycle?.name ?? '',
+    ].map((value) => escapeCsv(String(value)));
+  });
+  return [headers.map(escapeCsv).join(','), ...rows.map((row) => row.join(','))].join('\n');
+}
+
+fastify.get('/api/export', async (request, reply) => {
+  if (!linearClient) return reply.badRequest('Missing LINEAR_API_KEY');
+  const query = request.query as Record<string, string | undefined>;
+  const teamId = query.teamId;
+  if (!teamId) return reply.badRequest('teamId is required');
+
+  const filters = parseFilters(query);
+  const range = getCreatedAtRange(filters);
+  const cachedIssues = await linearClient.getIssues(teamId, { first: 100, preferCache: true, ...range });
+  const issues = cachedIssues.length ? cachedIssues : await linearClient.getIssues(teamId, { ...range });
+  const scoped = filterIssues(issues, filters);
+
+  const csv = issuesToCsv(scoped);
+  reply.header('Content-Type', 'text/csv; charset=utf-8');
+  reply.header('Content-Disposition', 'attachment; filename="linear-issues.csv"');
+  return csv;
 });
 
 type IssueRow = {
@@ -152,56 +352,20 @@ fastify.post('/api/issues-for-chart', async (request, reply) => {
   if (!linearClient) return reply.badRequest('Missing LINEAR_API_KEY');
   if (!body.teamId || !body.chart || !body.bucket) return reply.badRequest('teamId, chart, and bucket are required');
 
-  const cachedIssues = await linearClient.getIssues(body.teamId, 100, true);
-  const issues = cachedIssues.length ? cachedIssues : await linearClient.getIssues(body.teamId);
+  const range = getCreatedAtRange(body.filters);
+  const cachedIssues = await linearClient.getIssues(body.teamId, { first: 100, preferCache: true, ...range });
+  const issues = cachedIssues.length ? cachedIssues : await linearClient.getIssues(body.teamId, { ...range });
   const baseFilters = body.filters ?? {};
-  const scoped = filterIssues(issues, baseFilters);
-
-  const filterByChart = () => {
-    switch (body.chart) {
-      case 'throughput':
-        return scoped.filter((issue) => {
-          if (!issue.completedAt) return false;
-          return weekLabel(new Date(issue.completedAt)) === body.bucket;
-        });
-      case 'bugsByState':
-        return scoped.filter(
-          (issue) => inferIssueType(issue) === 'bug' && (issue.state?.type || 'unknown') === body.bucket,
-        );
-      case 'bugsByAssignee':
-        return scoped.filter(
-          (issue) => inferIssueType(issue) === 'bug' && (issue.assignee?.name || 'Unassigned') === body.bucket,
-        );
-      case 'bugsByPriority':
-        return scoped.filter(
-          (issue) => inferIssueType(issue) === 'bug' && priorityLabel(issue) === body.bucket,
-        );
-      case 'bugsBySeverity':
-        return scoped.filter(
-          (issue) => inferIssueType(issue) === 'bug' && severityLabel(issue) === body.bucket,
-        );
-      case 'prompt': {
-        const spec = body.spec;
-        if (!spec) return [];
-        const mergedFilters = applySpecFilter(baseFilters, spec.filter);
-        const promptScoped = filterIssues(issues, mergedFilters);
-        const grouped = spec.groupBy && spec.groupBy !== 'null';
-        return promptScoped.filter((issue) => {
-          const bucket = bucketFromSpec(issue, spec.xAxis);
-          if (bucket !== body.bucket) return false;
-          if (!grouped) return true;
-          const groupKey = groupFromSpec(issue, spec.groupBy as any);
-          return groupKey === body.series;
-        });
-      }
-      default:
-        return scoped;
-    }
-  };
-
-  const filtered = filterByChart();
+  const filtered = filterIssuesForChart({
+    issues,
+    baseFilters,
+    chart: body.chart,
+    bucket: body.bucket,
+    series: body.series,
+    spec: body.spec,
+  });
   const rows: IssueRow[] = filtered.map((issue) => ({
-    id: issue.id,
+    id: issue.identifier || issue.id,
     title: issue.title,
     type: inferIssueType(issue),
     creator: issue.creator?.name || 'Unknown',
@@ -213,6 +377,37 @@ fastify.post('/api/issues-for-chart', async (request, reply) => {
   }));
 
   return { issues: rows };
+});
+
+fastify.post('/api/export-chart', async (request, reply) => {
+  const body = request.body as {
+    teamId?: string;
+    filters?: Filters;
+    chart?: 'throughput' | 'bugsByState' | 'bugsByAssignee' | 'bugsByPriority' | 'bugsBySeverity' | 'prompt';
+    bucket?: string;
+    series?: string;
+    spec?: ChartSpec;
+  };
+  if (!linearClient) return reply.badRequest('Missing LINEAR_API_KEY');
+  if (!body.teamId || !body.chart) return reply.badRequest('teamId and chart are required');
+
+  const range = getCreatedAtRange(body.filters);
+  const cachedIssues = await linearClient.getIssues(body.teamId, { first: 100, preferCache: true, ...range });
+  const issues = cachedIssues.length ? cachedIssues : await linearClient.getIssues(body.teamId, { ...range });
+  const baseFilters = body.filters ?? {};
+  const filtered = filterIssuesForChart({
+    issues,
+    baseFilters,
+    chart: body.chart,
+    bucket: body.bucket,
+    series: body.series,
+    spec: body.spec,
+  });
+
+  const csv = issuesToCsv(filtered);
+  reply.header('Content-Type', 'text/csv; charset=utf-8');
+  reply.header('Content-Disposition', 'attachment; filename=\"linear-issues-chart.csv\"');
+  return csv;
 });
 
 function applySpecFilter(filters: Filters, filterString?: string): Filters {

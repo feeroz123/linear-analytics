@@ -9,9 +9,8 @@ import '@mantine/notifications/styles.css';
 import '@mantine/dates/styles.css';
 
 const queryClient = new QueryClient();
-const colorSchemeManager = localStorageColorSchemeManager({ key: 'linear-theme' });
-
 function Root() {
+  const colorSchemeManager = localStorageColorSchemeManager({ key: 'linear-theme' });
   return (
     <React.StrictMode>
       <ColorSchemeScript defaultColorScheme="light" />

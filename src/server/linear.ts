@@ -9,6 +9,7 @@ type LinearLabel = { name: string };
 type LinearIssueNode = Omit<LinearIssue, 'labels'> & { labels?: { nodes?: LinearLabel[] } | null };
 export type LinearIssue = {
   id: string;
+  identifier: string;
   title: string;
   url: string;
   createdAt: string;
@@ -110,8 +111,15 @@ export class LinearClient {
     return teams;
   }
 
-  async getIssues(teamId: string, first = 100, preferCache = false): Promise<LinearIssue[]> {
-    const cacheKey = `issues:${teamId}`;
+  async getIssues(
+    teamId: string,
+    options?: { first?: number; preferCache?: boolean; createdAfter?: string; createdBefore?: string },
+  ): Promise<LinearIssue[]> {
+    const first = options?.first ?? 100;
+    const preferCache = options?.preferCache ?? false;
+    const createdAfter = options?.createdAfter ?? null;
+    const createdBefore = options?.createdBefore ?? null;
+    const cacheKey = `issues:${teamId}:${createdAfter ?? 'na'}:${createdBefore ?? 'na'}`;
     const cached = this.getCache<LinearIssue[]>(cacheKey);
     const cachedIssues = cached ?? [];
     const hasUrlField = cachedIssues.length ? typeof cachedIssues[0].url === 'string' : true;
@@ -125,10 +133,11 @@ export class LinearClient {
     let hasNextPage = true;
     let after: string | null = null;
 
-    const query = `query Issues($teamId: ID!, $first: Int!, $after: String) {
-      issues(first: $first, after: $after, filter: { team: { id: { eq: $teamId } } }) {
+    const query = `query Issues($filter: IssueFilter!, $first: Int!, $after: String) {
+      issues(first: $first, after: $after, filter: $filter) {
         nodes {
           id
+          identifier
           title
           url
           createdAt
@@ -151,7 +160,16 @@ export class LinearClient {
     while (hasNextPage) {
       const data = await this.query<{
         issues: { nodes: LinearIssueNode[]; pageInfo: { hasNextPage: boolean; endCursor: string } };
-      }>(query, { teamId, first, after });
+      }>(query, {
+        first,
+        after,
+        filter: {
+          team: { id: { eq: teamId } },
+          ...(createdAfter || createdBefore
+            ? { createdAt: { gte: createdAfter ?? undefined, lte: createdBefore ?? undefined } }
+            : {}),
+        },
+      });
 
       const pageIssues = data.issues?.nodes ?? [];
       const normalized = pageIssues.map((issue): LinearIssue => ({

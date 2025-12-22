@@ -24,7 +24,7 @@ import {
   Legend,
   LabelList,
 } from 'recharts';
-import { IconMaximize, IconInfoCircle } from '@tabler/icons-react';
+import { IconDownload, IconMaximize, IconInfoCircle } from '@tabler/icons-react';
 import { Tooltip as MantineTooltip } from '@mantine/core';
 
 type Metrics = {
@@ -43,6 +43,12 @@ type Props = {
     bucket: string;
     title: string;
   }) => void;
+  onChartExport?: (payload: {
+    chart: 'throughput' | 'bugsByState' | 'bugsByAssignee' | 'bugsByPriority' | 'bugsBySeverity';
+    title: string;
+  }) => void;
+  linearHealthy?: boolean;
+  noticeMessage?: string;
 };
 
 const skeleton = <Skeleton height={160} radius="md" />;
@@ -65,7 +71,14 @@ function EmptyState() {
   );
 }
 
-export default function MetricsDashboard({ metrics, loading, onChartClick }: Props) {
+export default function MetricsDashboard({
+  metrics,
+  loading,
+  onChartClick,
+  onChartExport,
+  linearHealthy = true,
+  noticeMessage,
+}: Props) {
   const theme = useMantineTheme();
   const colorScheme = useComputedColorScheme('light');
   const palette =
@@ -89,16 +102,39 @@ export default function MetricsDashboard({ metrics, loading, onChartClick }: Pro
 
   return (
     <Stack mb="md">
-      <Text fw={700} size="lg">
-        Default Metrics
-      </Text>
+      <Group justify="space-between" align="center">
+        <Group gap="sm" align="center">
+          <Text fw={700} size="lg">
+            Default Metrics
+          </Text>
+          {noticeMessage && (
+            <Text size="sm" c="blue" fw={700}>
+              {noticeMessage}
+            </Text>
+          )}
+        </Group>
+        {!linearHealthy && (
+          <Text size="sm" c="red">
+            Linear API key is missing or invalid. Metrics are disabled.
+          </Text>
+        )}
+      </Group>
       <Stack gap="md">
         <ChartCard
           title={`Throughput (All Tickets: Weekly distribution) ${metrics ? `· ${formatTotal(throughputTotal)}` : ''}`}
           tooltip="Completed Tickets grouped by week based on completedAt."
-          loading={loading}
+          loading={loading || !linearHealthy}
+          onExport={
+            onChartExport
+              ? () =>
+                  onChartExport({
+                    chart: 'throughput',
+                    title: 'Throughput (All Tickets: Weekly distribution)',
+                  })
+              : undefined
+          }
           onExpand={
-            metrics && metrics.throughput.length
+            metrics && metrics.throughput.length && linearHealthy
               ? () =>
                   openModal(
                     'Throughput (All Tickets: Weekly distribution)',
@@ -107,7 +143,9 @@ export default function MetricsDashboard({ metrics, loading, onChartClick }: Pro
               : undefined
           }
         >
-          {loading ? skeleton : metrics && metrics.throughput.length ? (
+          {loading || !linearHealthy ? (
+            skeleton
+          ) : metrics && metrics.throughput.length ? (
             <BarChartFull
               data={metrics.throughput}
               color={palette[0]}
@@ -131,13 +169,24 @@ export default function MetricsDashboard({ metrics, loading, onChartClick }: Pro
               title={`Bugs by State ${metrics ? `· ${formatTotal(openClosedTotal)}` : ''}`}
               tooltip="Distribution of bug issues by Linear state type."
               loading={loading}
+              onExport={
+                onChartExport
+                  ? () =>
+                      onChartExport({
+                        chart: 'bugsByState',
+                        title: 'Bugs by State',
+                      })
+                  : undefined
+              }
               onExpand={
-                metrics && metrics.openVsClosed.length
+                metrics && metrics.openVsClosed.length && linearHealthy
                   ? () => openModal('Bugs by State', <PieChartFull data={metrics.openVsClosed} palette={palette} height={320} />)
                   : undefined
               }
             >
-              {loading ? skeleton : metrics && metrics.openVsClosed.length ? (
+              {loading || !linearHealthy ? (
+                skeleton
+              ) : metrics && metrics.openVsClosed.length ? (
                 <PieChartFull
                   data={metrics.openVsClosed}
                   palette={palette}
@@ -162,13 +211,24 @@ export default function MetricsDashboard({ metrics, loading, onChartClick }: Pro
               title={`Bugs / Assignee ${metrics ? `· ${formatTotal(bugsAssigneeTotal)}` : ''}`}
               tooltip="Count of bug-type issues per assignee."
               loading={loading}
+              onExport={
+                onChartExport
+                  ? () =>
+                      onChartExport({
+                        chart: 'bugsByAssignee',
+                        title: 'Bugs / Assignee',
+                      })
+                  : undefined
+              }
               onExpand={
-                metrics && metrics.bugsByAssignee.length
+                metrics && metrics.bugsByAssignee.length && linearHealthy
                   ? () => openModal('Bugs / Assignee', <BarAssignee data={metrics.bugsByAssignee} color={palette[2]} height={320} />)
                   : undefined
               }
             >
-              {loading ? skeleton : metrics && metrics.bugsByAssignee.length ? (
+              {loading || !linearHealthy ? (
+                skeleton
+              ) : metrics && metrics.bugsByAssignee.length ? (
                 <BarAssignee
                   data={metrics.bugsByAssignee}
                   color={palette[2]}
@@ -192,8 +252,17 @@ export default function MetricsDashboard({ metrics, loading, onChartClick }: Pro
               title={`Bugs by Priority ${metrics ? `· ${formatTotal(bugsSeverityTotal)}` : ''}`}
               tooltip="Bug counts grouped by priority."
               loading={loading}
+              onExport={
+                onChartExport
+                  ? () =>
+                      onChartExport({
+                        chart: 'bugsByPriority',
+                        title: 'Bugs by Priority',
+                      })
+                  : undefined
+              }
               onExpand={
-                metrics && metrics.bugsBySeverityPriority.length
+                metrics && metrics.bugsBySeverityPriority.length && linearHealthy
                   ? () =>
                       openModal(
                         'Bugs by Priority',
@@ -202,7 +271,9 @@ export default function MetricsDashboard({ metrics, loading, onChartClick }: Pro
                   : undefined
               }
             >
-              {loading ? skeleton : metrics && metrics.bugsBySeverityPriority.length ? (
+              {loading || !linearHealthy ? (
+                skeleton
+              ) : metrics && metrics.bugsBySeverityPriority.length ? (
                 <BarSeverity
                   data={metrics.bugsBySeverityPriority}
                   palette={palette}
@@ -226,8 +297,17 @@ export default function MetricsDashboard({ metrics, loading, onChartClick }: Pro
               title={`Bugs by Severity ${metrics ? `· ${formatTotal(bugsSeverityOnlyTotal)}` : ''}`}
               tooltip="Bug counts grouped by severity."
               loading={loading}
+              onExport={
+                onChartExport
+                  ? () =>
+                      onChartExport({
+                        chart: 'bugsBySeverity',
+                        title: 'Bugs by Severity',
+                      })
+                  : undefined
+              }
               onExpand={
-                metrics && metrics.bugsBySeverity.length
+                metrics && metrics.bugsBySeverity.length && linearHealthy
                   ? () =>
                       openModal(
                         'Bugs by Severity',
@@ -236,7 +316,9 @@ export default function MetricsDashboard({ metrics, loading, onChartClick }: Pro
                   : undefined
               }
             >
-              {loading ? skeleton : metrics && metrics.bugsBySeverity.length ? (
+              {loading || !linearHealthy ? (
+                skeleton
+              ) : metrics && metrics.bugsBySeverity.length ? (
                 <BarCategory
                   data={metrics.bugsBySeverity}
                   color={palette[3]}
@@ -268,12 +350,14 @@ function ChartCard({
   title,
   loading,
   onExpand,
+  onExport,
   children,
   tooltip,
 }: {
   title: string;
   loading?: boolean;
   onExpand?: () => void;
+  onExport?: () => void;
   children: React.ReactNode;
   tooltip?: string;
 }) {
@@ -292,9 +376,18 @@ function ChartCard({
             </MantineTooltip>
           )}
         </Group>
-        <ActionIcon variant="subtle" size="sm" onClick={onExpand} disabled={!onExpand} aria-label="Expand chart">
-          <IconMaximize size={16} />
-        </ActionIcon>
+        <Group gap="xs">
+          <MantineTooltip label="Export chart" withArrow>
+            <ActionIcon variant="subtle" size="sm" onClick={onExport} disabled={!onExport} aria-label="Export chart">
+              <IconDownload size={16} />
+            </ActionIcon>
+          </MantineTooltip>
+          <MantineTooltip label="Expand chart" withArrow>
+            <ActionIcon variant="subtle" size="sm" onClick={onExpand} disabled={!onExpand} aria-label="Expand chart">
+              <IconMaximize size={16} />
+            </ActionIcon>
+          </MantineTooltip>
+        </Group>
       </Group>
       {children}
     </Card>
