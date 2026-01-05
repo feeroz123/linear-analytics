@@ -27,6 +27,24 @@ function Root() {
             blue: ['#e9f2ff', '#d2e4ff', '#a7c9ff', '#7badff', '#4f92ff', '#1f78ff', '#0e66e6', '#0b52b4', '#083d82', '#052951'],
             slate: ['#f8fafc', '#f1f5f9', '#e2e8f0', '#cbd5e1', '#94a3b8', '#64748b', '#475569', '#334155', '#1e293b', '#0f172a'],
           },
+          components: {
+            Select: {
+              styles: {
+                dropdown: {
+                  backgroundColor: '#f5f5f5',
+                  border: '1px solid #d0d0d0',
+                },
+              },
+            },
+            MultiSelect: {
+              styles: {
+                dropdown: {
+                  backgroundColor: '#f5f5f5',
+                  border: '1px solid #d0d0d0',
+                },
+              },
+            },
+          },
         }}
       >
         <Notifications position="top-right" />

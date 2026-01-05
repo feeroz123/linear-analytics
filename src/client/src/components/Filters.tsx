@@ -70,6 +70,8 @@ export default function FiltersBar({
   const dateDisabled = disabled || Boolean(filters.time) || Boolean(filters.cycleId);
   const cycleDisabled = disabled || Boolean(filters.time || filters.startDate || filters.endDate);
   const prevDateDisabled = React.useRef(dateDisabled);
+  const sortedTeams = [...teams].sort((a, b) => a.name.localeCompare(b.name));
+  const sortedPresets = [...savedPresets].sort((a, b) => a.name.localeCompare(b.name));
   const appliedBorder = (active: boolean) =>
     active
       ? {
@@ -114,10 +116,10 @@ export default function FiltersBar({
         <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
           <Select
             label="Team"
-            data={teams.map((t) => ({ value: t.id, label: t.name }))}
+            data={[{ value: '', label: 'None' }, ...sortedTeams.map((t) => ({ value: t.id, label: t.name }))]}
             placeholder="Select team"
-            value={teamId}
-            onChange={(val) => val && onSelectTeam(val)}
+            value={teamId || ''}
+            onChange={(val) => onSelectTeam(val || '')}
             searchable
             radius="md"
             disabled={disabled}
@@ -139,15 +141,18 @@ export default function FiltersBar({
         <Grid.Col span={{ base: 12, sm: 6, md: 3 }}>
           <Group gap="xs" align="end">
             <Select
-              label="Saved Filters"
-              data={savedPresets.map((preset) => ({ value: preset.id, label: preset.name }))}
+            label="Saved Filters"
+            data={[
+              { value: '', label: 'None' },
+              ...sortedPresets.map((preset) => ({ value: preset.id, label: preset.name })),
+            ]}
               placeholder="Select saved filters"
               value={selectedPresetId || ''}
-              onChange={(val) => val && onSelectPreset(val)}
+              onChange={(val) => (val ? onSelectPreset(val) : onSelectPreset(''))}
               searchable
               radius="md"
-              disabled={disabled || savedPresets.length === 0}
-              styles={{ root: { flex: 1 } }}
+              disabled={disabled}
+              styles={{ root: { flex: 1 }, ...appliedBorder(Boolean(selectedPresetId)) }}
             />
             <Tooltip label="Rename saved filters" withArrow>
               <ActionIcon

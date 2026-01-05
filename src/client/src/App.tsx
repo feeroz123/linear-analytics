@@ -50,8 +50,6 @@ export default function App() {
   React.useEffect(() => {
     if (teamsQuery.data && !teamId) {
       const saved = teamsQuery.data.lastTeam;
-      if (saved) setTeamId(saved);
-      else if (teamsQuery.data.teams.length) setTeamId(teamsQuery.data.teams[0].id);
       setFilters(defaultFilters);
     }
   }, [teamsQuery.data, teamId]);
@@ -100,6 +98,10 @@ export default function App() {
       setPromptLoading(false);
     }
   };
+
+  React.useEffect(() => {
+    setPromptResult(null);
+  }, [teamId, filters, metricsQuery.dataUpdatedAt]);
 
   const handleExport = async () => {
     if (!teamId) return;
@@ -198,6 +200,10 @@ export default function App() {
   };
 
   const handleSelectPreset = (id: string) => {
+    if (!id) {
+      setSelectedPresetId(null);
+      return;
+    }
     const preset = presetsQuery.data?.presets.find((item) => item.id === id);
     if (!preset) return;
     if (preset.teamId) setTeamId(preset.teamId);
@@ -330,7 +336,11 @@ export default function App() {
               onEditPreset={handleEditPreset}
               onDeletePreset={handleDeletePreset}
               selectedPresetId={selectedPresetId}
-              onClearFilters={() => setFilters(defaultFilters)}
+              onClearFilters={() => {
+                setFilters(defaultFilters);
+                setSelectedPresetId(null);
+                setTeamId(null);
+              }}
               assignees={metricsQuery.data?.assignees || []}
               creators={metricsQuery.data?.creators || []}
               cycles={metricsQuery.data?.cycles || []}

@@ -261,7 +261,9 @@ function collectAssignees(issues: LinearIssue[]) {
       map.set(issue.assignee.id, issue.assignee.name);
     }
   });
-  return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  return Array.from(map.entries())
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function collectCreators(issues: LinearIssue[]) {
@@ -271,7 +273,9 @@ function collectCreators(issues: LinearIssue[]) {
       map.set(issue.creator.id, issue.creator.name);
     }
   });
-  return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  return Array.from(map.entries())
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function collectCycles(issues: LinearIssue[]) {
@@ -281,7 +285,9 @@ function collectCycles(issues: LinearIssue[]) {
       map.set(issue.cycle.id, { name: issue.cycle.name, number: issue.cycle.number });
     }
   });
-  return Array.from(map.entries()).map(([id, info]) => ({ id, ...info }));
+  return Array.from(map.entries())
+    .map(([id, info]) => ({ id, ...info }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 function collectStates(issues: LinearIssue[]) {
@@ -299,7 +305,9 @@ function collectProjects(issues: LinearIssue[]) {
       map.set(issue.project.id, issue.project.name);
     }
   });
-  return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  return Array.from(map.entries())
+    .map(([id, name]) => ({ id, name }))
+    .sort((a, b) => a.name.localeCompare(b.name));
 }
 
 export function buildMetrics(issues: LinearIssue[], filters: Filters) {
